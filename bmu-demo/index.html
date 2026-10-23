@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#02050b">
+  <meta name="theme-color" content="#a61d24">
   <title>BMU Past Questions — Demo</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
   <a class="brand" href="#home">
-    <img src="../BMU%20Past%20Questions%20App%20Icon.png" alt="BMU Past Questions">
-    <div><strong>BMU Past Questions</strong><span>Powered by Miracle Nexus</span></div>
+    <span class="brand-mark">MN</span>
+    <div><strong>BMU Past Questions</strong><span>Independent study platform by Miracle Nexus</span></div>
   </a>
   <button id="menuBtn" class="menu-btn" aria-label="Open menu"><span></span><span></span><span></span></button>
   <nav id="nav">
     <a href="#features">Features</a>
     <a href="#nexus">Nexus AI</a>
     <a href="#about">About</a>
+    <a href="../index.html#privacy">Privacy</a>
+    <a href="../index.html#delete-account">Delete Account</a>
     <button id="demoLogin" class="primary">Open Demo</button>
   </nav>
 </header>
@@ -25,24 +27,24 @@
 <main id="publicSite">
   <section id="home" class="hero">
     <div class="hero-copy reveal">
-      <span class="eyebrow">YOUR DIGITAL STUDY COMPANION</span>
-      <h1>Study smarter.<br><em>Prepare better.</em></h1>
-      <p>Practice course questions, learn with Nexus AI, use study tools and prepare from one professional academic platform.</p>
+      <span class="eyebrow">ACADEMIC STUDY PLATFORM</span>
+      <h1>Study with focus.<br><em>Prepare with confidence.</em></h1>
+      <p>Practice course questions, review explanations, use Nexus AI for study support and keep your academic tools in one organized place.</p>
       <div class="actions"><button id="startDemo" class="primary">View Demo Dashboard</button><a class="secondary" href="#features">Explore Features</a></div>
-      <small>Independent educational platform. Not an official Bayelsa Medical University application.</small>
+      <small>Independent educational platform developed by Miracle Nexus. Not affiliated with, endorsed by, sponsored by, operated by, or an official application of Bayelsa Medical University.</small>
     </div>
     <div class="hero-card reveal">
-      <div class="mock-head"><img src="../BMU%20Past%20Questions%20App%20Icon.png" alt=""><div><strong>BMU Past Questions</strong><span>Study Smart • Achieve More</span></div></div>
-      <div class="mock-banner"><span>STUDY DASHBOARD</span><h2>Everything you need in one place.</h2></div>
+      <div class="mock-head"><span class="mock-logo">MN</span><div><strong>BMU Past Questions</strong><span>Study tools in one place</span></div></div>
+      <div class="mock-banner"><span>STUDY DASHBOARD</span><h2>Continue your preparation.</h2><p>Access questions, AI support, materials and results from one workspace.</p></div>
       <div class="mock-grid"><div><b>01</b><span>Past Questions</span></div><div><b>02</b><span>Nexus AI</span></div><div><b>03</b><span>Study Groups</span></div><div><b>04</b><span>Results</span></div></div>
     </div>
   </section>
 
   <section id="features" class="section">
-    <div class="section-title reveal"><span>MAIN FEATURES</span><h2>Built for serious study.</h2></div>
+    <div class="section-title reveal"><span>CORE FEATURES</span><h2>Built around real study tasks.</h2><p>Simple tools, clear workflows and less visual noise.</p></div>
     <div class="cards">
       <article class="card reveal"><i>01</i><h3>Past Questions</h3><p>Course-based MCQ practice with timer, navigation, scoring and explanations.</p></article>
-      <article class="card reveal"><i>02</i><h3>Nexus AI</h3><p>AI study support and question fallback when a course does not have enough stored questions.</p></article>
+      <article class="card reveal"><i>02</i><h3>Nexus AI</h3><p>Study support for explanations, revision and question generation when needed.</p></article>
       <article class="card reveal"><i>03</i><h3>Study Groups</h3><p>Prepare with friends in focused group sessions.</p></article>
       <article class="card reveal"><i>04</i><h3>Materials</h3><p>Notes, lecturer materials and learning resources in one place.</p></article>
       <article class="card reveal"><i>05</i><h3>Performance</h3><p>Review scores and monitor study progress.</p></article>
@@ -51,15 +53,15 @@
   </section>
 
   <section id="nexus" class="section nexus">
-    <div class="nexus-panel reveal"><div><span class="eyebrow">NEXUS AI</span><h2>Smart question fallback.</h2><p>Stored questions are used first. When a course is incomplete, Nexus AI can generate the missing questions, validate them, and add only the usable questions to the study session.</p></div><div class="ai-orb">AI</div></div>
+    <div class="nexus-panel reveal"><div><span class="eyebrow">NEXUS AI</span><h2>AI support where it is useful.</h2><p>Use Nexus AI to explain concepts, support revision and generate study questions when stored course content is incomplete. AI responses can contain mistakes and should be reviewed as study support.</p></div><div class="ai-badge">AI</div></div>
   </section>
 
-  <section id="about" class="section about reveal"><span class="eyebrow">MIRACLE NEXUS</span><h2>Built for smarter university study.</h2><p>BMU Past Questions combines past questions, AI assistance, materials and academic tools in a clean web and mobile-friendly study experience.</p></section>
+  <section id="about" class="section about reveal"><span class="eyebrow">MIRACLE NEXUS</span><h2>Designed as an independent university study tool.</h2><p>BMU Past Questions combines past questions, AI assistance, study materials and academic tools in a clean mobile-friendly experience.</p><div class="about-links"><a href="../index.html#privacy">Privacy Policy</a><a href="../index.html#delete-account">Account Deletion</a></div></section>
 </main>
 
 <section id="dashboard" class="dashboard hidden">
   <aside class="sidebar">
-    <div class="side-logo"><img src="../BMU%20Past%20Questions%20App%20Icon.png" alt=""></div>
+    <div class="side-logo">MN</div>
     <button class="side active" data-view="home" title="Dashboard">⌂</button>
     <button class="side" data-view="questions" title="Past Questions">▤</button>
     <button class="side" title="Nexus AI">AI</button>
@@ -78,13 +80,13 @@
     </div>
     <div id="questionsView" class="hidden">
       <button id="dashBack" class="text-btn">← Dashboard</button>
-      <span class="eyebrow">PAST QUESTIONS</span><h2 class="page-title">Practice Session</h2><p class="muted">Stored questions first. Nexus AI fills missing questions.</p>
+      <span class="eyebrow">PAST QUESTIONS</span><h2 class="page-title">Practice Session</h2><p class="muted">Stored questions first. Nexus AI fills missing questions when available.</p>
       <div class="practice"><div><label>Course</label><select><option>CSC 301 — Operating Systems</option><option>ANA 302 — Neuroanatomy</option><option>PIO 305 — Neurophysiology I</option></select><label>Question Type</label><select><option>MCQ</option></select><label>Number of Questions</label><select><option>30</option><option>50</option><option>70</option></select><button id="simulate" class="primary full">Prepare Session</button><p id="simMsg" class="status"></p></div><aside><span class="eyebrow">NEXUS AI FALLBACK</span><h3>Automatic completion</h3><p>Example: 18 stored + 12 validated AI questions = 30-question session.</p></aside></div>
     </div>
   </div>
 </section>
 
-<footer>BMU Past Questions • Powered by Miracle Nexus</footer>
+<footer><div>BMU Past Questions · Developed by Miracle Nexus</div><div><a href="../index.html#privacy">Privacy Policy</a> · <a href="../index.html#delete-account">Delete Account</a></div><small>Independent educational study platform. Not an official BMU application.</small></footer>
 <script src="app.js"></script>
 </body>
 </html>
