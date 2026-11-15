@@ -600,3 +600,11 @@ body > .nexus-bell-panel .nexus-notice-empty{color:inherit;font-size:13px;paddin
  body > .nexus-bell-panel .nexus-bell-item{padding:10px!important}
  body > .nexus-bell-panel .nexus-bell-item p{font-size:13px!important}
 }
+
+/* Make student dashboard notices and public announcement text readable in both themes. */
+#dashboard .notices-panel .notice-item strong,#dashboard .notices-panel .notice-item h3{color:#142033!important;font-size:15px!important;line-height:1.4!important}
+#dashboard .notices-panel .notice-item p{color:#334155!important;font-size:13px!important;line-height:1.65!important;white-space:pre-wrap;overflow-wrap:break-word}
+body.dark #dashboard .notices-panel .notice-item strong,body.dark #dashboard .notices-panel .notice-item h3{color:#fff!important}
+body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
+.nexus-public-news .nexus-news-card h3{color:var(--text)!important}
+.nexus-public-news .nexus-news-card p{color:var(--text)!important;opacity:.88;overflow-wrap:break-word;white-space:pre-wrap}
