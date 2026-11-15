@@ -1,25 +1,25 @@
-// Activate APK links only when the actual files exist at the website URL.
-// Keep store badges informational until official store URLs are verified.
-(async function () {
+// The official Android APKs are published as assets of GitHub Release v1.0.0.
+// Links go directly to GitHub Releases; cross-origin HEAD checks are not reliable.
+// Store badges remain informational until their official listings are verified.
+(function () {
   const anchors = document.querySelectorAll('[data-apk-link]');
+  const expectedRelease = 'https://github.com/okerentiemiracle17-sketch/bmu-past-questions-privacy/releases/download/v1.0.0/';
   let available = 0;
   for (const a of anchors) {
-    const url = a.getAttribute('href');
-    try {
-      const response = await fetch(url, {method:'HEAD',cache:'no-store'});
-      if (response.ok && (response.headers.get('content-type') || '').indexOf('text/html') === -1) {
-        a.removeAttribute('aria-disabled');
-        available++;
-      }
-    } catch (_) { /* Keep disabled until uploaded. */ }
+    if ((a.getAttribute('href') || '').startsWith(expectedRelease)) {
+      a.removeAttribute('aria-disabled');
+      a.removeAttribute('download');
+      a.setAttribute('rel', 'noopener noreferrer');
+      available++;
+    } else {
+      a.setAttribute('aria-disabled', 'true');
+    }
     a.addEventListener('click', (e) => {
       if (a.getAttribute('aria-disabled') === 'true') e.preventDefault();
     });
   }
   const status = document.getElementById('nexusApkStatus');
   if (status) status.textContent = available === 2
-    ? 'Both Android APK downloads are available. Choose the version compatible with your device.'
-    : available === 1
-    ? 'One Android APK is available; the other will be enabled when uploaded.'
-    : 'Android download files have not been uploaded to this website yet. You can continue studying in your browser.';
+    ? 'Both Android APK downloads are published on GitHub Releases. Choose the version compatible with your device.'
+    : 'Android download links are being configured. You can continue studying in your browser.';
 })();
