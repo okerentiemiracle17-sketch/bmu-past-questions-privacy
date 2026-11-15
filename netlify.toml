@@ -1,0 +1,13 @@
+# Nexus BMU Past Questions — static website deployment
+# Keep the privacy-policy repository root and GitHub Pages paths unchanged.
+[build]
+  publish = "nexus-preview"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
