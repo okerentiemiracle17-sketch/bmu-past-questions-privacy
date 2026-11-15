@@ -492,3 +492,14 @@ body.dark-mode .nexus-app-download__status,body[data-theme="dark"] .nexus-app-do
 .nexus-app-download__stores .nexus-store-image-card{color:inherit}
 @media(max-width:640px){.nexus-app-download__store-grid{grid-template-columns:1fr}.nexus-download-card-image{max-height:145px}}
 @media(prefers-reduced-motion:reduce){.nexus-browser-image-link{transition:none}.nexus-browser-image-link:hover{transform:none}}
+
+/* Mobile homepage: keep the study introduction close to the navigation. */
+@media (max-width:760px){
+  #publicWebsite #home.hero{padding:0 0 28px!important;min-height:0!important;}
+  #publicWebsite #home .hero-inner{min-height:0!important;padding:16px 22px 30px!important;align-items:start!important;align-content:start!important;gap:26px!important;}
+  #publicWebsite #home .hero-content{align-self:start!important;margin:0!important;padding:0!important;}
+  #publicWebsite #home .miracle-badge{margin-top:0!important;}
+}
+@media (max-width:390px){
+  #publicWebsite #home .hero-inner{padding-left:16px!important;padding-right:16px!important;}
+}
