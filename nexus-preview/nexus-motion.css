@@ -1,0 +1,27 @@
+/* Miracle Nexus: additive motion layer; no application styles or business logic replaced. */
+:root { --nexus-motion-ease:cubic-bezier(.22,1,.36,1); }
+.nexus-scroll-progress {position:fixed;top:0;left:0;width:100%;height:3px;z-index:150;pointer-events:none;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,#b5092c,#f34b59,#70c6ff);box-shadow:0 0 12px rgba(243,75,89,.26)}
+#publicWebsite .feature-card,#publicWebsite .about-card,#publicWebsite .nexus-card{transition:transform .65s var(--nexus-motion-ease),box-shadow .65s var(--nexus-motion-ease),border-color .5s ease,opacity .7s var(--nexus-motion-ease)}
+#publicWebsite .feature-card:hover{transform:translateY(-7px);box-shadow:0 20px 55px rgba(0,0,0,.24)}
+#publicWebsite .feature-icon{transition:transform .6s var(--nexus-motion-ease)}
+#publicWebsite .feature-card:hover .feature-icon{transform:translateY(-3px) rotate(-7deg) scale(1.08)}
+#publicWebsite .hero-float{will-change:transform;animation:nexusAmbientFloat 8s ease-in-out infinite alternate}
+#publicWebsite .hero-cap{animation-delay:-2.2s;animation-duration:10s}
+#publicWebsite .hero-science{animation-delay:-4.2s;animation-duration:12s}
+#publicWebsite .hero-note{animation-delay:-1s;animation-duration:9s}
+@keyframes nexusAmbientFloat {0%{transform:translate3d(0,0,0) rotate(-4deg)}100%{transform:translate3d(6px,-15px,0) rotate(5deg)}}
+#publicWebsite .primary-btn,#publicWebsite .secondary-btn,#publicWebsite .nav-create-btn{transition:transform .35s var(--nexus-motion-ease),box-shadow .35s ease,background .25s ease}
+#publicWebsite .primary-btn:hover,#publicWebsite .secondary-btn:hover,#publicWebsite .nav-create-btn:hover{transform:translateY(-2px)}
+#publicWebsite .primary-btn:active,#publicWebsite .secondary-btn:active{transform:translateY(0) scale(.98)}
+/* Motion is progressive enhancement: nothing is hidden if JavaScript does not run. */
+@media(min-width:640px){
+  #publicWebsite .feature-card.nexus-motion-entry{opacity:0;transform:translateY(24px) scale(.985)}
+  #publicWebsite .feature-card.nexus-motion-entry.nexus-motion-in{opacity:1;transform:none;transition-delay:var(--nexus-stagger,0ms)}
+}
+#publicWebsite .nexus-animated-word{display:inline-block;will-change:transform,opacity}
+#publicWebsite .nexus-animated-word.nexus-word-in{animation:nexusWordReveal .85s var(--nexus-motion-ease) both;animation-delay:var(--nexus-word-delay,0ms)}
+@keyframes nexusWordReveal{from{opacity:0;transform:translateY(.55em) rotate(2deg);filter:blur(4px)}to{opacity:1;transform:none;filter:blur(0)}}
+#publicWebsite .phone-card{transition:transform .55s var(--nexus-motion-ease),box-shadow .55s ease}
+#publicWebsite .phone-card:focus-within{transform:translateY(-3px)}
+@media(hover:none){#publicWebsite .feature-card:hover,#publicWebsite .primary-btn:hover,#publicWebsite .secondary-btn:hover,#publicWebsite .nav-create-btn:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.nexus-scroll-progress{transition:none}#publicWebsite .feature-card,#publicWebsite .feature-icon,#publicWebsite .primary-btn,#publicWebsite .secondary-btn,#publicWebsite .nav-create-btn,#publicWebsite .phone-card{transition:none!important;animation:none!important}#publicWebsite .hero-float,#publicWebsite .nexus-animated-word{animation:none!important;transform:none!important}#publicWebsite .feature-card.nexus-motion-entry{opacity:1!important;transform:none!important}}
