@@ -1354,3 +1354,16 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
  #dashboard :is(button,input,select,textarea){-webkit-tap-highlight-color:transparent}
  #dashboard .dashboard-sidebar{-webkit-overflow-scrolling:touch}
 }
+
+
+/* Clear academic source boundaries and AI alternatives for uncatalogued levels */
+#dashboard .missing-course-help{
+ margin-top:16px;padding:16px;border:1px solid var(--border);
+ background:var(--surface2);color:var(--text);border-radius:14px;text-align:left;
+}
+#dashboard .missing-course-help>strong{display:block;font-size:15px;color:var(--text)!important}
+#dashboard .missing-course-help p{margin:8px 0 12px;color:var(--soft)!important;font-size:13px;line-height:1.55}
+#dashboard .missing-course-help small{display:block;margin-top:11px;color:var(--soft)!important;line-height:1.5}
+#dashboard .missing-course-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+#dashboard .missing-course-actions button{min-height:44px;max-width:100%;white-space:normal}
+@media(max-width:600px){#dashboard .missing-course-help{padding:14px}#dashboard .missing-course-actions{display:grid;grid-template-columns:minmax(0,1fr)}#dashboard .missing-course-actions button{width:100%}}
