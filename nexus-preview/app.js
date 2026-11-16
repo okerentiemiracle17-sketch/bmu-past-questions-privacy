@@ -382,7 +382,81 @@ function setNexusMode(mode){document.querySelectorAll('.nexus-mode').forEach(b=>
 document.querySelectorAll('.nexus-mode').forEach(b=>b.addEventListener('click',()=>setNexusMode(b.dataset.nexusMode)));
 $('newNexusChatBtn')?.addEventListener('click',()=>{$('nexusConversation').innerHTML='<div class="ai-message"><strong>Nexus AI</strong><p>New conversation. What would you like to study?</p></div>';setNexusMode('chat')});
 $('openPastQuestionsFromAi')?.addEventListener('click',()=>go('past-questions'));
-$('openMaterialUploadBtn')?.addEventListener('click',async()=>{const f=$('nexusUploadFile')?.files?.[0];if(!f){alert('Choose a PDF, TXT or image first.');return}const format=$('nexusUploadType')?.value||'mcq',count=Math.min(30,Number($('nexusUploadCount')?.value)||10),topic=$('nexusUploadTopic')?.value.trim()||f.name;try{$('openMaterialUploadBtn').disabled=true;$('openMaterialUploadBtn').textContent='Nexus AI is reading your material…';let body={action:'generate',format,count,topic};if(f.type==='text/plain'||f.name.toLowerCase().endsWith('.txt'))body.source_text=await f.text();else{const buf=await f.arrayBuffer();let bin='';const bytes=new Uint8Array(buf);for(let i=0;i<bytes.length;i+=0x8000)bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));body.file_base64=btoa(bin);body.mime_type=f.type||'application/pdf'}const r=await supabaseClient.functions.invoke('ai-question-generator',{body});if(r.error||r.data?.error)throw new Error(r.data?.message||r.data?.error||r.error?.message);const generated=r.data?.result?.questions||[];if(!generated.length)throw new Error('No usable questions were generated from this material.');pendingGeneratedPractice={format,topic,rows:generated,count};go('past-questions');$('courseSelect').value='';$('manualCourseCode').value='UPLOAD';$('manualCourseName').value=topic;$('questionType').value=format;$('questionCount').value=String(count);msg($('practiceSetupMessage'),`${generated.length} ${format.toUpperCase()} questions were generated from your upload. Choose a timer and press Start Practice.`,'success')}catch(e){alert(e.message||'Nexus AI could not generate questions from this upload.')}finally{$('openMaterialUploadBtn').disabled=false;$('openMaterialUploadBtn').textContent='Generate from Upload'}});
+
+function showNexusUploadCount(){
+ const files=Array.from($('nexusUploadFile')?.files||[]);
+ const info=$('nexusUploadFilesInfo');if(!info)return;
+ const size=files.reduce((n,f)=>n+f.size,0);
+ info.textContent=files.length?files.length+' selected file'+(files.length===1?'':'s')+' • '+(size/1048576).toFixed(1)+' MB total • up to 5 files, 10 MB each, 30 MB combined':'Choose up to 5 PDF, TXT, PNG or JPG files, including multiple pictures. Maximum 10 MB each and 30 MB altogether.';
+}
+$('nexusUploadFile')?.addEventListener('change',showNexusUploadCount);
+// Separate from Ask Nexus chat: the topic/upload generator never consumes chat quota.
+async function nexusUploadPracticeFiles(files,format,count,topic){
+ if(files.length<1||files.length>5)throw new Error('Select between 1 and 5 source files.');
+ if(files.some(f=>f.size>10*1048576))throw new Error('Each file must be 10 MB or smaller.');
+ if(files.reduce((total,f)=>total+f.size,0)>30*1048576)throw new Error('Combined files must be 30 MB or smaller.');
+ const parts=await Promise.all(files.map(studyAiFilePart));
+ const valid=[],seen=new Set(),attempts=Array(files.length).fill(0);
+ // Split each source into bounded batches and join the questions after validation.
+ let rounds=0,lastError='';
+ while(valid.length<count&&rounds<4){
+  const still=count-valid.length,remainingRequests=files.map((_,i)=>i).filter(i=>attempts[i]<4);
+  if(!remainingRequests.length)break;
+  const allocations=[];let slots=still;
+  for(let k=0;k<remainingRequests.length&&slots>0;k++){
+   const idx=remainingRequests[k],left=remainingRequests.length-k;
+   const allocation=Math.min(10,Math.max(1,Math.ceil(slots/left)));
+   allocations.push({idx,allocation});slots-=allocation;
+  }
+  if(!allocations.length)break;
+  const jobs=allocations.map(async job=>{
+   const i=job.idx;attempts[i]++;
+   const covered=valid.slice(-12).map(q=>String(q.question||'').slice(0,100));
+   const body={action:'generate',format,count:job.allocation,topic:topic+' — source '+(i+1)+': '+files[i].name+(covered.length?'. Do not repeat these questions: '+JSON.stringify(covered).slice(0,1300):''),...parts[i]};
+   const res=await supabaseClient.functions.invoke('ai-question-generator',{body});
+   if(res.error||res.data?.error)throw new Error(res.data?.message||res.error?.message||'Question generation failed.');
+   return res.data?.result?.questions||[];
+  });
+  // Work in groups of two to avoid overloading the AI provider.
+  let gained=0;
+  for(let offset=0;offset<jobs.length;offset+=2){
+   const batch=await Promise.allSettled(jobs.slice(offset,offset+2));
+   for(const outcome of batch){
+    if(outcome.status==='rejected'){lastError=outcome.reason?.message||'AI service unavailable';continue}
+    for(const q of outcome.value){
+     if(!validStudyAiQuestion(q,format))continue;
+     const key=studyAiQuestionKey(q);
+     if(!key||seen.has(key))continue;
+     seen.add(key);valid.push(q);gained++;
+     if(valid.length>=count)break;
+    }
+    if(valid.length>=count)break;
+   }
+   if(valid.length>=count)break;
+  }
+  rounds++;
+  if(!gained)break;
+  $('openMaterialUploadBtn').textContent='Prepared '+valid.length+' of '+count+' questions…';
+ }
+ if(!valid.length)throw new Error(lastError||'No accurate questions with complete answers and explanations could be prepared from these materials.');
+ return valid.slice(0,count);
+}
+$('openMaterialUploadBtn')?.addEventListener('click',async()=>{
+ const files=Array.from($('nexusUploadFile')?.files||[]);
+ if(!files.length){alert('Choose one or more PDF, TXT or image files first.');return}
+ const format=$('nexusUploadType')?.value||'mcq',count=Math.min(30,Number($('nexusUploadCount')?.value)||10);
+ const topic=$('nexusUploadTopic')?.value.trim()||'Uploaded course materials';
+ const button=$('openMaterialUploadBtn'),original=button.textContent;
+ try{
+  button.disabled=true;button.textContent='Reading '+files.length+' source file'+(files.length===1?'':'s')+'…';
+  const generated=await nexusUploadPracticeFiles(files,format,count,topic);
+  pendingGeneratedPractice={format,topic,rows:generated,count};
+  go('past-questions');$('courseSelect').value='';$('manualCourseCode').value='UPLOAD';$('manualCourseName').value=topic;
+  $('questionType').value=format;$('questionCount').value=String(count);
+  msg($('practiceSetupMessage'),generated.length+' unique '+format.toUpperCase()+' practice questions prepared from '+files.length+' uploaded files, with answers and explanations. Select a timer and press Start Practice.'+(generated.length<count?' Only '+generated.length+' passed validation.':''),'success');
+ }catch(error){alert(error.message||'Nexus AI could not generate questions from your files.')}
+ finally{button.disabled=false;button.textContent=original||'Generate from Upload'}
+});
 $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusGeneratePrompt')?.value.trim();if(!prompt){msg($('nexusGenerateMessage'),'Describe the course or topic first.','error');return}const format=$('nexusGenerateType').value,count=Math.min(30,Number($('nexusGenerateCount').value)||10);$('nexusGenerateBtn').disabled=true;msg($('nexusGenerateMessage'),`Nexus AI is generating ${count} ${format.toUpperCase()} questions…`);try{const r=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count,topic:prompt}});if(r.error||r.data?.error)throw new Error(r.data?.message||r.data?.error||r.error?.message);const rows=r.data?.result?.questions||[];if(!rows.length)throw new Error('Nexus AI did not return usable questions.');pendingGeneratedPractice={format,topic:prompt,rows,count};const m=prompt.toUpperCase().match(/\b[A-Z]{2,4}\s*-?\s*\d{3}\b/);go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=m?m[0].replace(/\s*-\s*/,' ').trim():'AI';$('manualCourseName').value=prompt;$('questionType').value=format;$('questionCount').value=String(count);msg($('practiceSetupMessage'),`${rows.length} ${format.toUpperCase()} questions were generated by Nexus AI. Choose a timer and press Start Practice.`,'success')}catch(e){msg($('nexusGenerateMessage'),e.message||'Nexus AI could not generate the questions.','error')}finally{$('nexusGenerateBtn').disabled=false}});
 $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),'Nexus AI is thinking...');try{const r=await supabaseClient.functions.invoke('ai-tutor',{body:{action:'explain',question:q,programme:profile?.programme||'',style:$('nexusStyle').value,format_instruction:'Give a moderate, clear student-friendly answer with short headings, short paragraphs and lists when useful.'}});if(r.error)throw r.error;const a=s(r.data?.answer).trim();if(!a)throw new Error(r.data?.error||'Nexus AI returned an empty response.');addChat('Nexus AI',a,'ai-message');rememberNexus(q,a);const u=r.data?.ai_usage;const sourceNote=r.data?.source_mode==='general_ai_unverified'?' • General academic explanation (not verified against BMU materials)':r.data?.source_mode==='approved_bmu_resources'?' • Based on matched BMU study resources':r.data?.source_mode==='web_verified'?' • Web-grounded explanation':'';msg($('nexusStatus'),(u?`Today: ${u.used??0}/${u.daily_limit??'?'} requests used • ${u.remaining??'?'} remaining`:'')+sourceNote,'success')}catch(e2){addChat('Nexus AI',e2.message||'Unable to connect right now.','ai-message');msg($('nexusStatus'),e2.message||'Unable to connect.','error')}finally{$('nexusAskBtn').disabled=false}});
 function nexusRichText(text){
