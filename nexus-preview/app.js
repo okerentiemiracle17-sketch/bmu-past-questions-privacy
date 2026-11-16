@@ -419,15 +419,14 @@ function showNexusUploadCount(){
  const files=Array.from($('nexusUploadFile')?.files||[]);
  const info=$('nexusUploadFilesInfo');if(!info)return;
  const size=files.reduce((n,f)=>n+f.size,0);
- info.textContent=files.length?files.length+' selected file'+(files.length===1?'':'s')+' • '+(size/1048576).toFixed(1)+' MB total • up to 5 files, 10 MB each, 30 MB combined':'Choose up to 5 PDF, TXT, PNG or JPG files, including multiple pictures. Maximum 10 MB each and 30 MB altogether.';
+ info.textContent=files.length?files.length+' selected file'+(files.length===1?'':'s')+' • '+(size/1048576).toFixed(1)+' MB total • up to 20 files, 10 MB each, 200 MB combined':'Choose up to 20 PDF, TXT, PNG or JPG files, including multiple pictures. Maximum 10 MB each and 200 MB altogether.';
 }
 $('nexusUploadFile')?.addEventListener('change',showNexusUploadCount);
 // Separate from Ask Nexus chat: the topic/upload generator never consumes chat quota.
 async function nexusUploadPracticeFiles(files,format,count,topic){
- if(files.length<1||files.length>5)throw new Error('Select between 1 and 5 source files.');
+ if(files.length<1||files.length>20)throw new Error('Select between 1 and 20 source files.');
  if(files.some(f=>f.size>10*1048576))throw new Error('Each file must be 10 MB or smaller.');
- if(files.reduce((total,f)=>total+f.size,0)>30*1048576)throw new Error('Combined files must be 30 MB or smaller.');
- const parts=await Promise.all(files.map(studyAiFilePart));
+ if(files.reduce((total,f)=>total+f.size,0)>200*1048576)throw new Error('Combined files must be 200 MB or smaller.');
  const valid=[],seen=new Set(),attempts=Array(files.length).fill(0);
  // Split each source into bounded batches and join the questions after validation.
  let rounds=0,lastError='',emptyRounds=0;
@@ -444,7 +443,8 @@ async function nexusUploadPracticeFiles(files,format,count,topic){
   const jobs=allocations.map(job=>async()=>{
    const i=job.idx;attempts[i]++;
    const covered=valid.slice(-12).map(q=>String(q.question||'').slice(0,100));
-   const body={action:'generate',format,count:job.allocation,topic:topic+' — source '+(i+1)+': '+files[i].name+(covered.length?'. Do not repeat these questions: '+JSON.stringify(covered).slice(0,1300):''),...parts[i]};
+   const source=await studyAiFilePart(files[i]);
+   const body={action:'generate',format,count:job.allocation,topic:topic+' — source '+(i+1)+': '+files[i].name+(covered.length?'. Do not repeat these questions: '+JSON.stringify(covered).slice(0,1300):''),...source};
    const res=await supabaseClient.functions.invoke('ai-question-generator',{body});
    if(res.error||res.data?.error)throw new Error(res.data?.message||res.error?.message||'Question generation failed.');
    return res.data?.result?.questions||[];
@@ -868,8 +868,7 @@ async function studyAiFilePart(file){
  return{file_base64:btoa(binary),mime_type:name.endsWith('.pdf')?'application/pdf':name.endsWith('.png')?'image/png':'image/jpeg'};
 }
 async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle,count,files=[]){
- const all=[],seen=new Set(),parts=[];
- for(const file of files)parts.push(await studyAiFilePart(file));
+ const all=[],seen=new Set();
  const base=studyAiTopic(format,courseCode,courseTitle);
  // Run at most two independent requests concurrently. Parallel small batches
  // finish faster than waiting for each batch, without unbounded provider calls.
@@ -882,7 +881,7 @@ async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle
   let assigned=0;
   const requests=Array.from({length:jobs},(_,index)=>{
    const n=Math.min(maxBatch,remaining-assigned);assigned+=n;
-   const source=parts.length?parts[(round*2+index)%parts.length]:null;
+   const source=files.length?files[(round*2+index)%files.length]:null;
    const topic=base+(recent.length?' Do not repeat these questions: '+JSON.stringify(recent).slice(0,2000):'')+
     (jobs>1?' Produce a distinct question set for batch '+(index+1)+'; avoid common repeated examples.':'');
    return {n,source,topic};
@@ -890,7 +889,8 @@ async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle
   attempts+=jobs;round++;
   msg($('studyRoomLobbyMessage'),`Preparing ${all.length} of ${count} valid ${format.toUpperCase()} questions…`,'info');
   const results=await Promise.allSettled(requests.map(async job=>{
-   const body={action:job.source?'generate':'web_generate',format,count:job.n,topic:job.topic,...(job.source||{})};
+   const source=job.source?await studyAiFilePart(job.source):{};
+   const body={action:job.source?'generate':'web_generate',format,count:job.n,topic:job.topic,...source};
    const response=await supabaseClient.functions.invoke('ai-question-generator',{body});
    if(response.error||response.data?.error)throw new Error(response.data?.message||response.error?.message||'AI generator temporarily unavailable');
    if(!Array.isArray(response.data?.result?.questions))throw new Error('AI did not return a question list');
@@ -929,8 +929,8 @@ $('startStudyRoomBtn')?.addEventListener('click',async e=>{
   try{
     msg($('studyRoomLobbyMessage'),`Nexus AI is preparing ${count} validated ${format.toUpperCase()} questions for ${code}…`);
     const files=Array.from($('groupAiFile')?.files||[]);
-    if(files.length>5)throw new Error('Select at most 5 files per room.');
-    if(files.reduce((sum,file)=>sum+file.size,0)>30*1024*1024)throw new Error('Combined upload size must be 30 MB or less.');
+    if(files.length>20)throw new Error('Select at most 20 files per room.');
+    if(files.reduce((sum,file)=>sum+file.size,0)>200*1024*1024)throw new Error('Combined upload size must be 200 MB or less.');
     const prepared=await generateValidatedStudyRoomQuestions(format,code,name,count,files);
     if(prepared.length!==count)throw new Error(`Nexus AI prepared only ${prepared.length} of ${count} valid questions. The session was not started; please retry or select fewer questions.`);
     const up=await supabaseClient.from('study_rooms').update({activity:'study',question_source:'ai',question_format:format,selected_course:code,total_questions:prepared.length,time_limit_minutes:minutes}).eq('id',roomData.id);
