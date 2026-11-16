@@ -275,7 +275,36 @@ body{overflow-x:hidden}.topbar{backdrop-filter:blur(18px);-webkit-backdrop-filte
 #groupAiFile{width:100%;padding:10px;border:1px dashed #d6384b;border-radius:9px;color:inherit}
 
 /* v21 theory question style */
-#groupAiDifficulty{width:100%;min-height:42px;padding:10px;border:1px solid #8886;border-radius:9px;background:var(--input-bg,#fff);color:inherit} 
+#groupAiDifficulty{
+ width:100%;min-height:42px;padding:10px;
+ border:1px solid #59616d;border-radius:9px;
+ background:#17191f!important;color:#fff!important;
+ -webkit-text-fill-color:#fff!important;
+ color-scheme:dark;
+}
+#groupAiDifficulty option{
+ background:#17191f!important;color:#fff!important;
+ -webkit-text-fill-color:#fff!important;
+}
+#groupAiDifficulty:focus-visible{
+ outline:2px solid #d64b58;outline-offset:2px;
+}
+/* Native dropdown contrast for all dashboard forms in both themes. */
+#dashboard select{color-scheme:light;}
+body.dark #dashboard select{color-scheme:dark;}
+/* Study Group cards retain their dark backgrounds even when the site theme is light. */
+#dashboard .study-room-main-card select,
+#dashboard .participants-card select,
+#dashboard .host-room-controls select{
+ background:#17191f!important;color:#fff!important;
+ -webkit-text-fill-color:#fff!important;
+ color-scheme:dark;
+}
+#dashboard .study-room-main-card select option,
+#dashboard .participants-card select option,
+#dashboard .host-room-controls select option{
+ background:#17191f!important;color:#fff!important;
+} 
 
 /* 2026 Nexus Past Papers CBT — scoped additions, preserving legacy layouts */
 .past-paper-panel{margin:0 0 22px;padding:clamp(18px,3vw,28px);border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text)}
