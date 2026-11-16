@@ -462,26 +462,35 @@ async function syncSpectateRequests(){
  try{
   const {data,error}=await supabaseClient.rpc('get_my_pending_spectate_requests',{p_room_id:roomId});
   if(error)throw error;
-  const holder=document.getElementById('spectatePermissionPrompt')||document.createElement('div');
-  holder.id='spectatePermissionPrompt';holder.className='spectate-permission-prompt';
-  if(!holder.isConnected)document.body.appendChild(holder);
   if(roomData?.id!==roomId)return;
   const requests=Array.isArray(data)?data:[];
-  if(!requests.length){holder.classList.add('hidden');holder.innerHTML='';holder.dataset.requestId='';return}
-  const req=requests[0];holder.classList.remove('hidden');
-  if(holder.dataset.requestId===req.id&&holder.querySelector('button'))return;
-  holder.dataset.requestId=req.id;
-  holder.innerHTML='<strong>Spectating request</strong><p>'+esc(req.requester_name||'A participant')+' wants to watch your quiz progress. You can continue answering.</p><div class="spectate-actions"><button type="button" data-accept="true">Allow</button><button type="button" data-accept="false">Decline</button></div>';
-  holder.querySelectorAll('button').forEach(button=>button.addEventListener('click',async()=>{
-   if(spectateRequestBusy)return;spectateRequestBusy=true;
-   holder.querySelectorAll('button').forEach(x=>x.disabled=true);
-   try{const response=await supabaseClient.rpc('respond_study_room_spectate',{p_request_id:req.id,p_accept:button.dataset.accept==='true'});
-    if(response.error)throw response.error;
-    holder.dataset.requestId='';holder.classList.add('hidden');holder.innerHTML='';
-   }catch(e){alert(e.message||'Unable to respond to spectating request.')}
-   finally{spectateRequestBusy=false}
-  }));
- }catch(e){console.warn('spectating permission check',e)}
+  const holder=document.getElementById('spectatePermissionPrompt')||document.createElement('section');
+  holder.id='spectatePermissionPrompt';
+  holder.className='spectate-permission-prompt';
+  holder.setAttribute('role','region');holder.setAttribute('aria-label','Spectating requests');
+  if(!holder.isConnected)document.body.appendChild(holder);
+  const ids=requests.map(req=>req.id).join(',');
+  if(!requests.length){holder.classList.add('hidden');holder.innerHTML='';holder.dataset.requestIds='';return}
+  holder.classList.remove('hidden');
+  if(holder.dataset.requestIds===ids)return;
+  holder.dataset.requestIds=ids;
+  holder.innerHTML='<strong>Who wants to spectate?</strong><p class="spectate-intro">You can accept multiple people and continue answering questions.</p>'+requests.map(req=>
+   '<div class="spectate-request-item" data-request-id="'+esc(req.id)+'"><p><strong>'+esc(req.requester_name||'A participant')+'</strong> wants to spectate your progress.</p><div class="spectate-actions"><button type="button" data-accept="true">Allow</button><button type="button" data-accept="false">Decline</button></div></div>'
+  ).join('');
+  holder.querySelectorAll('.spectate-request-item').forEach(item=>{
+   const requestId=item.dataset.requestId;
+   item.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(item.dataset.busy)return;item.dataset.busy='true';
+    item.querySelectorAll('button').forEach(x=>x.disabled=true);
+    try{
+     const result=await supabaseClient.rpc('respond_study_room_spectate',{p_request_id:requestId,p_accept:btn.dataset.accept==='true'});
+     if(result.error)throw result.error;
+     holder.dataset.requestIds='';item.remove();
+     if(!holder.querySelector('.spectate-request-item'))holder.classList.add('hidden');
+    }catch(err){alert(err.message||'Could not respond to spectator');item.dataset.busy='';item.querySelectorAll('button').forEach(x=>x.disabled=false)}
+   }));
+  });
+ }catch(err){console.warn('spectate check',err)}
 }
 async function requestSpectate(targetId,name){try{const r=await supabaseClient.rpc('request_study_room_spectate',{p_room_id:roomData.id,p_target_id:targetId});if(r.error)throw r.error;spectateTargetId=targetId;alert(`Spectate request sent to ${name||'participant'}. You will only see progress if they accept.`);startSpectateStatusPoll()}catch(e){alert(e.message||'Unable to request spectating.')}}
 function startSpectateStatusPoll(){
@@ -545,7 +554,37 @@ function showGroupReview(r){$('groupReviewBox').classList.remove('hidden');$('gr
 $('groupSubmitTheoryBtn')?.addEventListener('click',async()=>{const a=$('groupTheoryAnswer').value.trim();if(a.length<5){alert('Type your answer first.');return}$('groupSubmitTheoryBtn').disabled=true;try{const r=await supabaseClient.functions.invoke('study-theory-grade',{body:{room_id:roomData.id,question_no:groupNo,answer_text:a}});if(r.error||r.data?.error)throw new Error(r.data?.error||r.error?.message);await loadGroupQ(groupNo);alert('Answer submitted and graded by Nexus AI.')}catch(e2){alert(e2.message||'Unable to grade answer.')}finally{$('groupSubmitTheoryBtn').disabled=false}});
 $('quitGroupQuizBtn')?.addEventListener('click',leaveRoom);$('groupPreviousBtn')?.addEventListener('click',()=>loadGroupQ(groupNo-1));$('groupNextBtn')?.addEventListener('click',()=>loadGroupQ(groupNo+1));$('finishGroupBtn')?.addEventListener('click',finishGroup);async function finishGroup(){if(!roomData)return;if(!confirm('Finish your quiz? You will wait for the other participants before final results.'))return;try{const fn=roomData?.question_source==='ai'?'finish_ai_study_room_participant':'finish_study_room_participant';const r=await supabaseClient.rpc(fn,{p_room_id:roomData.id});if(r.error)throw r.error;$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.remove('hidden');const rows=await loadParticipants();renderSpectateWaiting(rows);if(rows.length&&rows.every(x=>x.finished))groupResults()}catch(e2){alert(e2.message||'Could not finish room.')}}
 function renderSpectateWaiting(rows=[]){const el=$('spectateParticipants');if(!el)return;const active=rows.filter(x=>!x.finished&&x.user_id!==user.id);el.innerHTML=active.length?'':'<div class="material-empty">Everyone has finished. Preparing results…</div>';active.forEach(r=>{const d=document.createElement('div');d.className='participant-item';d.innerHTML=`<strong>${esc(r.display_name||'Student')}</strong><span>${r.answered_count||0} answered</span>`;const b=document.createElement('button');b.type='button';b.className='secondary-btn';b.textContent='Request to spectate';b.onclick=()=>requestSpectate(r.user_id,r.display_name);d.appendChild(b);el.appendChild(d)})}
-async function groupResults(){stopRoom();$('studyRoomLobby').classList.add('hidden');$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.add('hidden');$('groupResults').classList.remove('hidden');try{let rows=[];if(groupFormat==='theory'){const r=await supabaseClient.rpc('get_study_room_theory_leaderboard',{p_room_id:roomData.id});rows=Array.isArray(r.data)?r.data:[]}else{const r=await supabaseClient.rpc('get_study_room_participants',{p_room_id:roomData.id});rows=Array.isArray(r.data)?r.data:[];rows.sort((a,b)=>Number(b.score||0)-Number(a.score||0))}$('groupLeaderboard').innerHTML='';rows.forEach((r,i)=>{const d=document.createElement('div');d.className='leaderboard-row';d.innerHTML=`<strong>#${i+1}</strong><div><strong>${esc(r.display_name||'Student')}</strong><small>${r.finished?'Finished':'Submitted'}</small></div><strong>${groupFormat==='theory'?`${esc(r.total_score??0)} • ${esc(r.percentage??0)}%`:esc(r.score??0)}</strong>`;$('groupLeaderboard').appendChild(d)});await renderGroupAnswerReview()}catch(e2){$('groupLeaderboard').innerHTML='<div class="material-empty">Unable to load leaderboard.</div>'}}
+async function groupResults(){
+ stopRoom();$('studyRoomLobby').classList.add('hidden');$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.add('hidden');$('groupResults').classList.remove('hidden');
+ if(spectateRefreshTimer)clearInterval(spectateRefreshTimer);spectateRefreshTimer=null;
+ try{
+  let rows=[];
+  if(groupFormat==='theory'){
+   const r=await supabaseClient.rpc('get_study_room_theory_leaderboard',{p_room_id:roomData.id});
+   if(r.error)throw r.error;rows=Array.isArray(r.data)?r.data:[];
+  }else{
+   const r=await supabaseClient.rpc('get_study_room_participants',{p_room_id:roomData.id});
+   if(r.error)throw r.error;rows=Array.isArray(r.data)?r.data:[];
+   rows.sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+  }
+  // The secure participant table records finished_at; don't invent completion times.
+  const {data:times,error:timesError}=await supabaseClient.from('study_room_members')
+   .select('user_id,display_name,finished,finished_at').eq('room_id',roomData.id).is('left_at',null);
+  if(timesError)console.warn('Finish timestamps unavailable',timesError.message);
+  const byId=new Map((times||[]).map(x=>[x.user_id,x]));
+  const byName=new Map((times||[]).map(x=>[x.display_name,x]));
+  $('groupLeaderboard').innerHTML='';
+  rows.forEach((r,i)=>{
+   const participant=byId.get(r.user_id)||byName.get(r.display_name);
+   const time=participant?.finished_at?roomFinishLabel(participant.finished_at):(r.finished?'Finished':'Not finished');
+   const d=document.createElement('div');d.className='leaderboard-row';
+   d.innerHTML='<strong>#'+(i+1)+'</strong><div><strong>'+esc(r.display_name||'Student')+'</strong><small>'+esc(time)+'</small></div><strong>'+
+    (groupFormat==='theory'?esc(r.total_score??0)+' • '+esc(r.percentage??0)+'%':esc(r.score??0))+'</strong>';
+   $('groupLeaderboard').appendChild(d);
+  });
+  await renderGroupAnswerReview();
+ }catch(err){console.warn('Study leaderboard failed',err);$('groupLeaderboard').innerHTML='<div class="material-empty">Unable to load leaderboard.</div>'}
+}
 async function renderGroupAnswerReview(){const el=$('groupAnswerReview');if(!el||!roomData)return;el.innerHTML='<div class="material-empty">Loading your answers and explanations…</div>';const out=[];for(let i=0;i<Number(roomData.total_questions||groupTotal||0);i++){try{if(groupFormat==='theory'){const rev=await supabaseClient.rpc('get_my_study_room_theory_review',{p_room_id:roomData.id,p_question_no:i});const x=Array.isArray(rev.data)?rev.data[0]:null;if(x)out.push(`<article class="group-answer-review"><strong>Question ${i+1}</strong><p><b>Your answer:</b> ${esc(x.answer_text||'No answer')}</p><p><b>Score:</b> ${esc(x.ai_score??0)}/${esc(x.max_score??10)}</p><p><b>Feedback:</b> ${esc(x.feedback||'No graded answer was submitted before time expired.')}</p><p><b>Model answer:</b> ${esc(x.improved_answer||x.model_answer||'Review unavailable.')}</p></article>`)}else{const fn=roomData.question_source==='ai'?'get_my_ai_study_room_review':'get_my_study_room_answer_review';const rev=await supabaseClient.rpc(fn,{p_room_id:roomData.id,p_question_no:i});const x=Array.isArray(rev.data)?rev.data[0]:null;out.push(`<article class="group-answer-review"><strong>Question ${i+1}</strong><p><b>Your answer:</b> ${esc(x?.selected_option||'No answer')}</p><p><b>Correct answer:</b> ${esc(x?.correct_option||'Unavailable')}</p><p><b>Explanation:</b> ${esc(x?.explanation||'No explanation available.')}</p></article>`)}}catch(e){console.warn('review',i,e)}}el.innerHTML=out.join('')||'<div class="material-empty">No answer review is available for this session.</div>'}
 $('backToStudyRoomsBtn')?.addEventListener('click',leaveRoom);
 
