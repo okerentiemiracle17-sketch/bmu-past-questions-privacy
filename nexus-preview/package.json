@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "name": "nexus-bmu-static-site",
+  "version": "1.0.0",
+  "description": "Build-time image optimization for the Nexus BMU static website",
+  "scripts": {
+    "optimize-images": "node optimize-images.cjs"
+  },
+  "dependencies": {
+    "sharp": "0.34.5"
+  }
+}
