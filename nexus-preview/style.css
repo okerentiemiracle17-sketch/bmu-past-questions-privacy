@@ -1175,3 +1175,29 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
  .spectate-actions button{min-height:46px}
 }
 @media(prefers-reduced-motion:reduce){.spectate-actions button{transition:none!important}}
+
+
+/* Spectating progress must follow the dashboard theme, never a forced pale surface. */
+#dashboard .spectate-live-panel,
+#dashboard #spectateLivePanel {
+ background:var(--surface2)!important;
+ color:var(--text)!important;
+ border:1px solid var(--border)!important;
+ border-radius:14px;
+ box-shadow:none!important;
+}
+#dashboard .spectate-live-panel > strong,
+#dashboard .spectate-live-panel .spectate-progress-row strong {
+ color:var(--text)!important;
+ opacity:1!important;
+}
+#dashboard .spectate-live-panel p,
+#dashboard .spectate-live-panel .spectate-progress-row span {
+ color:var(--soft)!important;
+ opacity:1!important;
+}
+#dashboard .spectate-progress-row {
+ border-bottom:1px solid var(--border)!important;
+ color:var(--text)!important;
+}
+#dashboard .spectate-progress-row:last-child {border-bottom:0!important}
