@@ -1252,3 +1252,42 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
  line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;opacity:1!important;
 }
 @media(max-width:600px){#dashboard .group-answer-review .group-review-question{padding:12px;font-size:14px}}
+
+
+/* Review readability across Solo, Past Questions, Theory, and Study Groups.
+   Match each text colour to its actual card surface in light and dark themes. */
+#dashboard .review-original-question{
+ margin:12px 0 16px;padding:14px 16px;
+ border:1px solid var(--border);border-left:3px solid var(--brand);
+ border-radius:10px;background:var(--surface)!important;color:var(--text)!important;
+ font-size:15px;font-weight:650;line-height:1.6;white-space:pre-wrap;
+ overflow-wrap:anywhere;opacity:1!important;
+}
+#dashboard :is(#reviewBox,#theoryReviewBox,#groupReviewBox,.group-answer-review) {
+ background:var(--surface2)!important;color:var(--text)!important;
+ border-color:var(--border)!important;
+}
+#dashboard :is(#reviewBox,#theoryReviewBox,#groupReviewBox,.group-answer-review) :is(p,div,span,small,li) {
+ color:var(--soft)!important;opacity:1!important;
+}
+#dashboard :is(#reviewBox,#theoryReviewBox,#groupReviewBox,.group-answer-review) :is(strong,b,h3,h4) {
+ color:var(--text)!important;
+}
+#dashboard :is(#reviewBox,#theoryReviewBox) .review-original-question,
+#dashboard .group-answer-review .group-review-question{
+ background:var(--surface)!important;color:var(--text)!important;
+}
+#dashboard .group-answer-review p.group-review-question{
+ color:var(--text)!important;font-weight:650;
+}
+#dashboard .material-empty{background:var(--surface2);color:var(--soft)!important;border-color:var(--border)}
+#dashboard .room-selection-preview,
+#dashboard .waiting-message,
+#dashboard .group-finished-wait {
+ background:var(--surface2)!important;color:var(--text)!important;border-color:var(--border)!important;
+}
+#dashboard .room-selection-preview :is(p,span,small),
+#dashboard .waiting-message :is(p,span,small){color:var(--soft)!important}
+@media(max-width:600px){
+ #dashboard .review-original-question{padding:12px;font-size:14px}
+}
