@@ -616,7 +616,38 @@ async function groupResults(){
   await renderGroupAnswerReview();
  }catch(err){console.warn('Study leaderboard failed',err);$('groupLeaderboard').innerHTML='<div class="material-empty">Unable to load leaderboard.</div>'}
 }
-async function renderGroupAnswerReview(){const el=$('groupAnswerReview');if(!el||!roomData)return;el.innerHTML='<div class="material-empty">Loading your answers and explanations…</div>';const out=[];for(let i=0;i<Number(roomData.total_questions||groupTotal||0);i++){try{if(groupFormat==='theory'){const rev=await supabaseClient.rpc('get_my_study_room_theory_review',{p_room_id:roomData.id,p_question_no:i});const x=Array.isArray(rev.data)?rev.data[0]:null;if(x)out.push(`<article class="group-answer-review"><strong>Question ${i+1}</strong><p><b>Your answer:</b> ${esc(x.answer_text||'No answer')}</p><p><b>Score:</b> ${esc(x.ai_score??0)}/${esc(x.max_score??10)}</p><p><b>Feedback:</b> ${esc(x.feedback||'No graded answer was submitted before time expired.')}</p><p><b>Model answer:</b> ${esc(x.improved_answer||x.model_answer||'Review unavailable.')}</p></article>`)}else{const fn=roomData.question_source==='ai'?'get_my_ai_study_room_review':'get_my_study_room_answer_review';const rev=await supabaseClient.rpc(fn,{p_room_id:roomData.id,p_question_no:i});const x=Array.isArray(rev.data)?rev.data[0]:null;out.push(`<article class="group-answer-review"><strong>Question ${i+1}</strong><p><b>Your answer:</b> ${esc(x?.selected_option||'No answer')}</p><p><b>Correct answer:</b> ${esc(x?.correct_option||'Unavailable')}</p><p><b>Explanation:</b> ${esc(x?.explanation||'No explanation available.')}</p></article>`)}}catch(e){console.warn('review',i,e)}}el.innerHTML=out.join('')||'<div class="material-empty">No answer review is available for this session.</div>'}
+async function renderGroupAnswerReview(){
+ const el=$('groupAnswerReview');if(!el||!roomData)return;
+ el.innerHTML='<div class="material-empty">Loading your questions, answers and explanations…</div>';
+ const roomId=roomData.id,source=roomData.question_source,format=groupFormat,count=Number(roomData.total_questions||groupTotal||0);
+ const out=await Promise.all(Array.from({length:count},async(_,i)=>{
+  try{
+   const qFn=source==='ai'?'get_ai_study_room_question':format==='theory'?'get_study_room_theory_question':'get_study_room_question';
+   const reviewFn=format==='theory'?'get_my_study_room_theory_review':source==='ai'?'get_my_ai_study_room_review':'get_my_study_room_answer_review';
+   // Fetch the original question via the room-scoped, member-authorized RPC. Never invent questions from explanations.
+   const [questionResult,reviewResult]=await Promise.all([
+    supabaseClient.rpc(qFn,{p_room_id:roomId,p_question_no:i}),
+    supabaseClient.rpc(reviewFn,{p_room_id:roomId,p_question_no:i})
+   ]);
+   const question=Array.isArray(questionResult.data)?questionResult.data[0]:questionResult.data;
+   const answer=Array.isArray(reviewResult.data)?reviewResult.data[0]:reviewResult.data;
+   const prompt=s(question?.question_text).trim();
+   const questionHtml='<p class="group-review-question">'+esc(prompt||'Question text unavailable.')+'</p>';
+   if(format==='theory'){
+    return '<article class="group-answer-review"><strong>Question '+(i+1)+'</strong>'+questionHtml+
+     '<p><b>Your answer:</b> '+esc(answer?.answer_text||'No answer')+'</p>'+
+     '<p><b>Score:</b> '+esc(answer?.ai_score??0)+'/'+esc(answer?.max_score??10)+'</p>'+
+     '<p><b>Feedback:</b> '+esc(answer?.feedback||'No graded answer was submitted before time expired.')+'</p>'+
+     '<p><b>Model answer:</b> '+esc(answer?.improved_answer||answer?.model_answer||'Review unavailable.')+'</p></article>';
+   }
+   return '<article class="group-answer-review"><strong>Question '+(i+1)+'</strong>'+questionHtml+
+    '<p><b>Your answer:</b> '+esc(answer?.selected_option||'No answer')+'</p>'+
+    '<p><b>Correct answer:</b> '+esc(answer?.correct_option||'Unavailable')+'</p>'+
+    '<p><b>Explanation:</b> '+esc(answer?.explanation||'No explanation available.')+'</p></article>';
+  }catch(err){console.warn('Question review',i,err);return '<article class="group-answer-review"><strong>Question '+(i+1)+'</strong><p>Unable to load this question review.</p></article>'}
+ }));
+ if(roomData?.id===roomId)el.innerHTML=out.join('')||'<div class="material-empty">No answer review is available for this session.</div>';
+}
 $('backToStudyRoomsBtn')?.addEventListener('click',leaveRoom);
 
 /* RESULTS */
