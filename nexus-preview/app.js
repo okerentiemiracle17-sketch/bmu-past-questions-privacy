@@ -526,32 +526,58 @@ function studyAiTopic(format,code,title){
   if(format!=='theory')return `${base}. Generate challenging ${style}-style multiple choice questions with a correct answer and a clear explanation for every question.`;
   return `${base}. Generate rigorous university-level THEORY ${style} questions (not MCQs). ${style==='exam'?'Use difficult exam-standard, multi-part questions requiring analysis, application, comparisons and worked calculations where relevant.':'Use challenging class-test questions requiring understanding, explanation and problem solving.'} Each question must have a comprehensive accurate model answer, marking guidance and step-by-step explanation. Stay within the specified course and uploaded source if supplied. Do not claim questions are actual past exam questions.`;
 }
-async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle,count){
-  const all=[];const seen=new Set();let failures=0;
-  while(all.length<count){
-    const n=Math.min(format==='theory'?3:5,count-all.length);
-    let batch=null;
-    for(let attempt=0;attempt<3;attempt++){
-      try{
-        const r=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count:n,topic:studyAiTopic(format,courseCode,courseTitle)}});
-        if(r.error||r.data?.error)throw new Error(r.data?.message||r.error?.message||'AI service temporarily unavailable');
-        const rows=r.data?.result?.questions;
-        if(!Array.isArray(rows)||!rows.length)throw new Error('No valid questions returned');
-        batch=rows.filter(q=>{
-          if(!q||typeof q.question!=='string'||q.question.trim().length<12)return false;
-          if(format==='theory'&&(!q.model_answer||!q.marking_guide||!q.explanation))return false;
-          if(format==='mcq'&&(!Array.isArray(q.options)||q.options.length!==4||!Number.isInteger(q.correct_index)||q.correct_index<0||q.correct_index>3||!q.explanation))return false;
-          const key=q.question.toLowerCase().replace(/\s+/g,' ').trim();if(seen.has(key))return false;seen.add(key);return true;
-        });
-        if(batch.length)break;
-        throw new Error('Generated questions failed validation');
-      }catch(e){failures++;if(attempt===2)throw new Error('Nexus AI is temporarily unavailable. No room was started and no answers were lost. '+(e.message||''));await new Promise(resolve=>setTimeout(resolve,700*(attempt+1)));}
-    }
-    if(!batch?.length)break;
-    all.push(...batch);
-    if(batch.length<n)break;
-  }
-  return all.slice(0,count);
+// Keep generation bounded, deduplicated and source-grounded. Partial batches are normal.
+function validStudyAiQuestion(q,format){
+ if(!q||typeof q.question!=='string'||q.question.trim().length<12)return false;
+ if(format==='theory')return typeof q.model_answer==='string'&&q.model_answer.trim().length>=20&&
+  typeof q.marking_guide==='string'&&q.marking_guide.trim().length>=12&&
+  typeof q.explanation==='string'&&q.explanation.trim().length>=15;
+ return Array.isArray(q.options)&&q.options.length===4&&q.options.every(x=>typeof x==='string'&&x.trim())&&
+  new Set(q.options.map(x=>x.trim().toLowerCase())).size===4&&
+  Number.isInteger(q.correct_index)&&q.correct_index>=0&&q.correct_index<4&&
+  typeof q.explanation==='string'&&q.explanation.trim().length>=15;
+}
+function studyAiQuestionKey(q){return s(q.question).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+async function studyAiFilePart(file){
+ if(file.size>10*1024*1024)throw new Error('Each uploaded file must be 10 MB or smaller.');
+ const name=file.name.toLowerCase();
+ if(name.endsWith('.txt')||file.type==='text/plain')return{source_text:await file.text()};
+ if(!/\\.(pdf|png|jpe?g)$/.test(name))throw new Error('Only PDF, TXT, PNG and JPG files are supported.');
+ const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+ for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+ return{file_base64:btoa(binary),mime_type:name.endsWith('.pdf')?'application/pdf':name.endsWith('.png')?'image/png':'image/jpeg'};
+}
+async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle,count,files=[]){
+ const all=[],seen=new Set(),parts=[];
+ for(const file of files)parts.push(await studyAiFilePart(file));
+ const attemptCap=Math.min(32,Math.max(10,count*2)),base=studyAiTopic(format,courseCode,courseTitle);
+ let emptyRounds=0,lastError='';
+ for(let round=0;round<attemptCap&&all.length<count;round++){
+  const remaining=count-all.length,n=Math.min(format==='theory'?3:5,remaining);
+  // Rotate through source files; never add out-of-source web questions to an uploaded-material room.
+  const source=parts.length?parts[round%parts.length]:null;
+  const recent=all.slice(-12).map(q=>s(q.question).slice(0,110));
+  const topic=base+(recent.length?' Avoid repeating these previously accepted questions: '+JSON.stringify(recent).slice(0,1800):'');
+  try{
+   msg($('studyRoomLobbyMessage'),`Preparing ${all.length} of ${count} valid ${format.toUpperCase()} questions…`,'info');
+   const body={action:source?'generate':'web_generate',format,count:n,topic,...(source||{})};
+   const result=await supabaseClient.functions.invoke('ai-question-generator',{body});
+   if(result.error||result.data?.error)throw new Error(result.data?.message||result.error?.message||'AI generator temporarily unavailable');
+   const rows=result.data?.result?.questions;
+   if(!Array.isArray(rows))throw new Error('AI did not return a question list');
+   let added=0;
+   for(const q of rows){
+    if(!validStudyAiQuestion(q,format))continue;
+    const key=studyAiQuestionKey(q);if(!key||seen.has(key))continue;
+    seen.add(key);all.push(q);added++;
+    if(all.length===count)break;
+   }
+   emptyRounds=added?0:emptyRounds+1;
+  }catch(error){lastError=error?.message||'AI request failed';emptyRounds++}
+  if(emptyRounds>=6)break; // Fail clearly instead of repeating indefinitely.
+ }
+ if(all.length<count)throw new Error(`Nexus AI produced ${all.length} of ${count} unique, valid questions. No session was started. ${lastError?'Last issue: '+lastError+'. ':''}Try fewer questions or clearer course materials.`);
+ return all.slice(0,count);
 }
 
 /* Override the earlier click path by capturing AI-room starts before the normal handler. */
@@ -568,31 +594,10 @@ $('startStudyRoomBtn')?.addEventListener('click',async e=>{
   const btn=$('startStudyRoomBtn');btn.disabled=true;
   try{
     msg($('studyRoomLobbyMessage'),`Nexus AI is preparing ${count} validated ${format.toUpperCase()} questions for ${code}…`);
-    const file=$('groupAiFile')?.files?.[0];
-    let prepared;
-    if(file){
-      if(file.size>10*1024*1024)throw new Error('The uploaded file must be 10 MB or smaller.');
-      const topic=studyAiTopic(format,code,name);
-      const collected=[];
-      while(collected.length<count){
-        const n=Math.min(format==='theory'?3:5,count-collected.length);
-        const body={action:'generate',format,count:n,topic};
-        if(file.type==='text/plain'||file.name.toLowerCase().endsWith('.txt'))body.source_text=await file.text();
-        else{
-          const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
-          for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
-          body.file_base64=btoa(binary);
-          body.mime_type=file.type||(file.name.toLowerCase().endsWith('.pdf')?'application/pdf':'application/octet-stream');
-        }
-        const generated=await supabaseClient.functions.invoke('ai-question-generator',{body});
-        if(generated.error||generated.data?.error)throw new Error(generated.data?.message||generated.error?.message||'Could not read the uploaded material.');
-        const rows=generated.data?.result?.questions||[];if(!rows.length)break;
-        const valid=rows.filter(q=>q&&typeof q.question==='string'&&q.question.length>=12&&(format==='theory'?Boolean(q.model_answer&&q.marking_guide&&q.explanation):Boolean(Array.isArray(q.options)&&q.options.length===4&&Number.isInteger(q.correct_index)&&q.explanation)));
-        if(!Array.isArray(valid)||!valid.length)throw new Error('No generated questions passed validation.');
-        collected.push(...valid);if(valid.length<n)break;
-      }
-      prepared=collected.slice(0,count);
-    }else prepared=await generateValidatedStudyRoomQuestions(format,code,name,count);
+    const files=Array.from($('groupAiFile')?.files||[]);
+    if(files.length>5)throw new Error('Select at most 5 files per room.');
+    if(files.reduce((sum,file)=>sum+file.size,0)>30*1024*1024)throw new Error('Combined upload size must be 30 MB or less.');
+    const prepared=await generateValidatedStudyRoomQuestions(format,code,name,count,files);
     if(prepared.length!==count)throw new Error(`Nexus AI prepared only ${prepared.length} of ${count} valid questions. The session was not started; please retry or select fewer questions.`);
     const up=await supabaseClient.from('study_rooms').update({activity:'study',question_source:'ai',question_format:format,selected_course:code,total_questions:prepared.length,time_limit_minutes:minutes}).eq('id',roomData.id);
     if(up.error)throw up.error;
