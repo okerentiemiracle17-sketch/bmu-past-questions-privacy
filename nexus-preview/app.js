@@ -57,9 +57,24 @@ function pastPaperDept(c){return s(c.department).trim()||'All Programmes'}
 function pastPaperLevel(c){const match=s(c.level).match(/\d{3}|JUPEB/i);return match?match[0].toUpperCase():s(c.level).trim()}
 function pastPaperScopedCourses(){
  const dept=$('pastPaperDepartment')?.value||'',lv=$('pastPaperLevel')?.value||'';
- const data=departmentCurriculum.length?departmentCurriculum:courses;
- const match=data.filter(c=>{const level=pastPaperLevel(c);const sharedFirstYear=level==='100';const departmentMatches=!dept||sharedFirstYear||pastPaperDept(c)===dept||pastPaperDept(c).toLowerCase()==='all programmes';return departmentMatches&&(!lv||level===lv)});
- const unique=new Map();for(const c of match){const key=normalCourseCode(codeOf(c));if(key&&!unique.has(key))unique.set(key,c)}return [...unique.values()].sort((a,b)=>codeOf(a).localeCompare(codeOf(b)));
+ // Merge departmental curriculum AND the general course catalogue.
+ // Some valid courses (for example ANA 244 at 200 Level) exist only in courses.
+ // Prefer the department-specific record when the same course appears twice.
+ const combined=[...departmentCurriculum,...courses];
+ const match=combined.filter(c=>{
+  const level=pastPaperLevel(c);
+  const sharedFirstYear=level==='100';
+  const departmentMatches=!dept||sharedFirstYear||pastPaperDept(c)===dept||pastPaperDept(c).toLowerCase()==='all programmes';
+  return departmentMatches&&(!lv||level===lv);
+ });
+ const unique=new Map();
+ for(const c of match){
+  const key=normalCourseCode(codeOf(c));
+  if(!key)continue;
+  const previous=unique.get(key);
+  if(!previous||(dept&&pastPaperDept(c)===dept&&pastPaperDept(previous)!==dept))unique.set(key,c);
+ }
+ return [...unique.values()].sort((a,b)=>codeOf(a).localeCompare(codeOf(b)));
 }
 function resetPastPaperYears(){
  pastPaperLoadingSeq++;pastPaperList=[];
