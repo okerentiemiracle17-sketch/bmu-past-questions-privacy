@@ -247,7 +247,36 @@ async function submitQuiz(timed=false){if(submitted)return;if(!timed&&!confirm(`
 async function scorePremium(){reviews={};let correct=0,verifiedSaved=false;const stored=questions.filter(q=>!q.nexus_ai),ai=questions.filter(q=>q.nexus_ai);if(stored.length){const a={};stored.forEach(q=>a[String(q.id)]=answers[q.id]||'');if(ai.length===0){const sc=await supabaseClient.rpc('submit_secure_solo_quiz',{p_course_code:$('quizCourseCode').textContent,p_course_title:$('quizCourseTitle').textContent,p_answers:a});if(sc.error)throw sc.error;const sr=row(sc.data);correct=Number(sr.correct??0)||0;verifiedSaved=true}else{const sc=await supabaseClient.rpc('score_secure_quiz',{p_answers:a});if(sc.error)throw sc.error;const sr=row(sc.data);correct+=Number(sr.correct??sr.correct_count??0)||0}const rv=await supabaseClient.rpc('review_secure_quiz',{p_answers:a});if(rv.error)throw rv.error;(Array.isArray(rv.data)?rv.data:[]).forEach(r=>reviews[r.id??r.question_id]=r)}ai.forEach(q=>{const r=aiReviews[q.id];if(!r)return;const selected=s(answers[q.id]).toUpperCase(),ok=!!selected&&selected===s(r.correct_option).toUpperCase();if(ok)correct++;reviews[q.id]={...r,selected_option:selected,is_correct:ok}});await finishSolo(correct,verifiedSaved)}
 async function scoreFree(){reviews={};let correct=0;const a={};for(const q of questions){const selected=s(answers[q.id]).toUpperCase();a[String(q.id)]=selected;if(!selected){reviews[q.id]={selected_option:'',correct_option:'',explanation:'You did not answer this question.',is_correct:false};continue}const {data,error}=await supabaseClient.rpc('answer_demo_question',{p_question_id:q.id,p_selected_option:selected});if(error)throw error;const r=row(data);reviews[q.id]={...r,selected_option:selected};if(r.is_correct)correct++}let verifiedSaved=false;try{const save=await supabaseClient.rpc('submit_demo_solo_quiz',{p_course_code:$('quizCourseCode').textContent,p_course_title:$('quizCourseTitle').textContent,p_answers:a});if(!save.error)verifiedSaved=true}catch(_){}await finishSolo(correct,verifiedSaved)}
 async function finishSolo(correct,verifiedSaved=false){const total=questions.length,pct=total?Math.round(correct/total*100):0;$('resultTitle').textContent=pct>=70?'Strong Performance':pct>=50?'Good Attempt':'Keep Practising';$('resultSummary').textContent=`You scored ${correct} out of ${total}. ${verifiedSaved?'This verified session counts toward Solo Learning rank.':'AI-assisted sessions are saved to your history but do not change the secure leaderboard.'}`;$('resultStats').innerHTML=`<div><strong>${correct}/${total}</strong><span>SCORE</span></div><div><strong>${pct}%</strong><span>PERCENTAGE</span></div><div><strong>${Object.keys(answers).length}</strong><span>ANSWERED</span></div>`;if(!verifiedSaved){try{await supabaseClient.from('quiz_session_results').insert({user_id:user.id,course_code:$('quizCourseCode').textContent,course_title:$('quizCourseTitle').textContent,session_type:questions.some(q=>q.nexus_ai)?'nexus_ai':'solo',question_format:'mcq',score:correct,total,percentage:pct,source_breakdown:{stored:questions.filter(q=>!q.nexus_ai).length,ai:questions.filter(q=>q.nexus_ai).length},verified_for_leaderboard:false})}catch(e2){console.warn(e2)}}dashboardStats();if(!pageMap['solo-learning']?.classList.contains('hidden'))loadSoloLeaderboard()}
-$('reviewAnswersBtn')?.addEventListener('click',()=>{reviewMode=true;submitted=true;qIndex=0;$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.add('hidden');renderQ()});function renderReview(q){const r=reviews[q.id];$('reviewBox').classList.remove('hidden');$('reviewBox').innerHTML=r?`<h4>${r.is_correct?'Correct':'Review this question'}</h4><p><strong>Your Answer:</strong> ${esc(r.selected_option||'No answer')}</p><p><strong>Correct Answer:</strong> ${esc(r.correct_option??r.correct_answer??'Unavailable')}${r.answer_text?' — '+esc(r.answer_text):''}</p><p><strong>Explanation:</strong> ${esc(r.explanation||r.answer_explanation||'No explanation is available for this source question yet.')}</p>`:'Review unavailable.'}
+$('reviewAnswersBtn')?.addEventListener('click',()=>{reviewMode=true;submitted=true;qIndex=0;$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.add('hidden');renderQ()});const quizExplanationCache=new Map(),quizExplanationPending=new Set();
+function weakQuizExplanation(value){
+ const t=s(value).trim();
+ return t.length<160||/from .*lecturer note|directly matches the definition|distractors do not match|this follows from the definition, formula, identity, or calculation required|this is the standard mathematical\/statistical definition|because it is correct/i.test(t);
+}
+async function enrichQuizExplanation(questionId){
+ if(!Number.isSafeInteger(Number(questionId))||quizExplanationPending.has(questionId)||quizExplanationCache.has(questionId))return;
+ quizExplanationPending.add(questionId);
+ try{
+  const {data,error}=await supabaseClient.functions.invoke('cached-quiz-explanation',{body:{question_id:Number(questionId)}});
+  if(error||!data?.explanation||!['draft','approved','original'].includes(data.status))return;
+  const explanation=s(data.explanation).trim();
+  if(explanation.length<100)return;
+  quizExplanationCache.set(questionId,{explanation,status:data.status});
+  if(reviewMode&&submitted&&questions[qIndex]?.id===questionId)renderReview(questions[qIndex]);
+ }catch(error){console.warn('Review explanation currently unavailable',error)}
+ finally{quizExplanationPending.delete(questionId)}
+}
+function renderReview(q){
+ const r=reviews[q.id],box=$('reviewBox');
+ box.classList.remove('hidden');
+ const original=s(r?.explanation||r?.answer_explanation);
+ const cached=quizExplanationCache.get(q.id);
+ const explanation=cached?.explanation||original||'Explanation is pending review.';
+ const aiLabel=cached?.status==='draft'?'<p><small>AI-generated explanation — not yet academically verified.</small></p>':'';
+ box.innerHTML=r?`<h4>${r.is_correct?'Correct':'Review this question'}</h4><p><strong>Your Answer:</strong> ${esc(r.selected_option||'No answer')}</p><p><strong>Correct Answer:</strong> ${esc(r.correct_option??r.correct_answer??'Unavailable')}${r.answer_text?' — '+esc(r.answer_text):''}</p><p><strong>Explanation:</strong> ${esc(explanation)}</p>${aiLabel}`:'Review unavailable.';
+ // Only request a more specific explanation after the student has submitted.
+ // The server rechecks authorization, caches drafts and never edits answer keys.
+ if(r&&submitted&&reviewMode&&!cached&&weakQuizExplanation(original))void enrichQuizExplanation(q.id);
+}
 $('newSessionBtn')?.addEventListener('click',()=>{stopTimer();questions=[];answers={};reviews={};aiReviews={};submitted=false;reviewMode=false;qIndex=0;resetYearPastPaperUi();$('practiceSetup').classList.remove('hidden');$('quizShell').classList.add('hidden');$('theoryShell')?.classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard')?.classList.add('hidden');$('submitQuizBtn').classList.remove('hidden');msg($('practiceSetupMessage'),'')});
 
 
