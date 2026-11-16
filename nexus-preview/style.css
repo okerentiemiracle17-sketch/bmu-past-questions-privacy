@@ -927,3 +927,84 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
  #dashboard .dashboard-sidebar > .sidebar-plan{margin-top:12px!important}
  #dashboard .dashboard-sidebar > .logout-btn{margin-bottom:8px!important}
 }
+
+
+/* Production navigation finish: visible desktop vertical rail, Android-friendly bottom bar.
+   Breakpoints intentionally match the existing 700px mobile dashboard layout. */
+@media (min-width:821px){
+  #dashboard .dashboard-sidebar{
+    scrollbar-width:thin!important;
+    scrollbar-color:rgba(145,145,153,.8) transparent!important;
+    scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch;
+  }
+  #dashboard .dashboard-sidebar::-webkit-scrollbar{width:8px!important;display:block!important}
+  #dashboard .dashboard-sidebar::-webkit-scrollbar-thumb{
+    background:rgba(145,145,153,.8)!important;border-radius:999px!important;
+    border:2px solid var(--surface)!important;
+  }
+  #dashboard .dashboard-sidebar::-webkit-scrollbar-thumb:hover{background:var(--brand)!important}
+  #dashboard .dashboard-sidebar :is(.sidebar-item,.logout-btn):focus-visible,
+  #dashboard .dashboard-content :is(button,a,input,select,textarea):focus-visible{
+    outline:2px solid var(--brand)!important;outline-offset:2px;
+  }
+}
+@media (max-width:700px){
+  #dashboard.dashboard:not(.hidden){
+    overflow:visible!important;
+    max-width:100%!important;
+  }
+  #dashboard .dashboard-content{
+    box-sizing:border-box!important;
+    padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))!important;
+    overscroll-behavior-y:auto!important;
+    overflow-y:visible!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  #dashboard .dashboard-sidebar{
+    height:calc(72px + env(safe-area-inset-bottom,0px))!important;
+    max-height:calc(72px + env(safe-area-inset-bottom,0px))!important;
+    padding-top:6px!important;
+    padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))!important;
+    touch-action:pan-x!important;
+  }
+  #dashboard .dashboard-menu{
+    height:58px!important;
+    padding-right:70px!important;
+    scroll-padding-inline:7px;
+    scroll-snap-type:x proximity;
+    touch-action:pan-x!important;
+    overscroll-behavior-x:contain!important;
+  }
+  #dashboard .dashboard-menu .sidebar-item{
+    min-height:48px!important;height:48px!important;
+    min-width:54px!important;width:54px!important;flex-basis:54px!important;
+    touch-action:manipulation!important;
+  }
+  #dashboard .dashboard-sidebar .logout-btn{
+    right:8px!important;
+    bottom:calc(11px + env(safe-area-inset-bottom,0px))!important;
+    min-width:48px!important;width:48px!important;max-width:48px!important;
+    height:48px!important;min-height:48px!important;
+    touch-action:manipulation!important;
+  }
+  #dashboard .dashboard-content :is(input,select,textarea){
+    min-width:0;max-width:100%;font-size:16px;
+  }
+  #dashboard .dashboard-content :is(.dashboard-panel,.settings-card,.materials-panel,.setup-card,.nexus-admin-publisher){
+    min-width:0!important;
+    overflow-wrap:break-word;
+  }
+  #dashboard .dashboard-content :is(.quiz-actions,.result-actions){
+    flex-wrap:wrap;min-width:0;gap:10px;
+  }
+  #dashboard .dashboard-content :is(.primary-btn,.secondary-btn,.continue-action){
+    min-height:44px;touch-action:manipulation;
+  }
+}
+@media (max-width:380px){
+  #dashboard .dashboard-content .quick-tools{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (prefers-reduced-motion:reduce){
+  #dashboard .dashboard-sidebar{scroll-behavior:auto!important}
+}
