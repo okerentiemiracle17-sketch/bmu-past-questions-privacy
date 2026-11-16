@@ -792,9 +792,49 @@ async function loadResults(){msg($('resultsMessage'),'Loading results...');const
 /* CGPA */
 const gp={A:5,B:4,C:3,D:2,E:1,F:0};function addCgpa(course='',units=3,grade='A'){const d=document.createElement('div');d.className='cgpa-row';d.innerHTML=`<div><label>Course</label><input class="cgpa-course" value="${esc(course)}"></div><div><label>Units</label><input class="cgpa-unit" type="number" min="1" max="12" value="${units}"></div><div><label>Grade</label><select class="cgpa-grade">${Object.keys(gp).map(g=>`<option value="${g}"${g===grade?' selected':''}>${g}</option>`).join('')}</select></div><button class="remove-cgpa-row" type="button">×</button>`;d.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',calcCgpa));d.querySelector('button').addEventListener('click',()=>{d.remove();calcCgpa()});$('cgpaRows').appendChild(d);calcCgpa()}function calcCgpa(){let u=0,p=0;document.querySelectorAll('.cgpa-row').forEach(r=>{const units=Number(r.querySelector('.cgpa-unit').value)||0,g=r.querySelector('.cgpa-grade').value;u+=units;p+=units*(gp[g]??0)});$('cgpaValue').textContent=u?(p/u).toFixed(2):'0.00';$('cgpaUnits').textContent=`${u} total units`}$('addCgpaRowBtn')?.addEventListener('click',()=>addCgpa());addCgpa('Course 1',3,'A');addCgpa('Course 2',3,'B');
 
-/* PAYMENT - CURRENT LIVE WEB GATEWAY */
-$('payPremiumBtn')?.addEventListener('click',async()=>{$('payPremiumBtn').disabled=true;msg($('paymentMessage'),'Preparing secure payment...');try{const r=await supabaseClient.functions.invoke('paystack-initialize',{body:{}});if(r.error)throw r.error;if(!r.data?.authorization_url)throw new Error(r.data?.error||'Payment could not be initialized.');paymentRef=r.data.reference||'';localStorage.setItem('bmu_payment_reference',paymentRef);$('verifyPaymentBtn').classList.remove('hidden');window.open(r.data.authorization_url,'_blank','noopener,noreferrer');msg($('paymentMessage'),'Complete payment in the opened page, return here, then click Verify Payment.','success')}catch(e2){msg($('paymentMessage'),e2.message||'Unable to initialize payment.','error')}finally{$('payPremiumBtn').disabled=false}});
-$('verifyPaymentBtn')?.addEventListener('click',async()=>{const ref=paymentRef||localStorage.getItem('bmu_payment_reference')||'';if(!ref){msg($('paymentMessage'),'No payment reference found.','error');return}$('verifyPaymentBtn').disabled=true;msg($('paymentMessage'),'Verifying payment...');try{const r=await supabaseClient.functions.invoke('paystack-verify',{body:{reference:ref}});if(r.error||r.data?.verified!==true)throw new Error(r.data?.error||r.error?.message||'Payment not confirmed.');await loadProfile();updateAccess();msg($('paymentMessage'),`Payment verified. Premium active until ${expiry(r.data.expires_at)}.`,'success');localStorage.removeItem('bmu_payment_reference')}catch(e2){msg($('paymentMessage'),e2.message||'Payment has not been confirmed.','error')}finally{$('verifyPaymentBtn').disabled=false}});
+/* PAYMENT — open checkout from the click itself to avoid browser popup blocking. */
+function refreshPendingPaymentControl(){
+ const ref=localStorage.getItem('bmu_payment_reference')||'';
+ if($('verifyPaymentBtn'))$('verifyPaymentBtn').classList.toggle('hidden',!ref);
+}
+refreshPendingPaymentControl();
+$('payPremiumBtn')?.addEventListener('click',async()=>{
+ const btn=$('payPremiumBtn');btn.disabled=true;
+ msg($('paymentMessage'),'Preparing secure payment...');
+ // Opening a placeholder synchronously preserves the user gesture on mobile/desktop browsers.
+ const checkout=window.open('about:blank','_blank');
+ try{
+  if(checkout){checkout.document.title='Opening secure payment';checkout.document.body.textContent='Connecting to secure payment…';}
+  const r=await supabaseClient.functions.invoke('paystack-initialize',{body:{}});
+  if(r.error)throw r.error;
+  if(!r.data?.authorization_url||!/^https:\/\//i.test(r.data.authorization_url))throw new Error(r.data?.error||'The payment link could not be prepared.');
+  paymentRef=r.data.reference||'';
+  if(paymentRef)localStorage.setItem('bmu_payment_reference',paymentRef);
+  refreshPendingPaymentControl();
+  if(checkout&&!checkout.closed){checkout.location.replace(r.data.authorization_url);msg($('paymentMessage'),'Complete payment in the opened page. Return here and tap Verify Payment.','success');}
+  else{
+   // Do not lose the generated checkout URL if a popup blocker intervenes.
+   const link=document.createElement('a');link.href=r.data.authorization_url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open secure payment page';
+   const box=$('paymentMessage');box.textContent='';box.append('Your browser blocked the checkout window. ',link);
+  }
+ }catch(e2){
+  if(checkout&&!checkout.closed)checkout.close();
+  msg($('paymentMessage'),e2.message||'Unable to prepare payment. Please try again.','error');
+ }finally{btn.disabled=false}
+});
+$('verifyPaymentBtn')?.addEventListener('click',async()=>{
+ const ref=paymentRef||localStorage.getItem('bmu_payment_reference')||'';
+ if(!ref){msg($('paymentMessage'),'No pending payment reference found. Start payment first.','error');return}
+ const btn=$('verifyPaymentBtn');btn.disabled=true;msg($('paymentMessage'),'Checking your payment securely...');
+ try{
+  const r=await supabaseClient.functions.invoke('paystack-verify',{body:{reference:ref}});
+  if(r.error||r.data?.verified!==true)throw new Error(r.data?.error||r.error?.message||'Payment has not been confirmed yet. Complete payment and try verification again.');
+  await loadProfile();updateAccess();
+  msg($('paymentMessage'),`Payment verified. Premium active until ${expiry(r.data.expires_at)}.`,'success');
+  paymentRef='';localStorage.removeItem('bmu_payment_reference');refreshPendingPaymentControl();
+ }catch(e2){msg($('paymentMessage'),e2.message||'Payment has not been confirmed yet.','error')}
+ finally{btn.disabled=false}
+});
 
 /* PROFILE */
 function renderProfile(){if(!user)return;const n=displayName(),pr=isPremium(profile);$('settingsProfileInitial').textContent=n[0]?.toUpperCase()||'S';$('settingsUserName').textContent=n;$('settingsUserEmail').textContent=user.email||'';$('settingsAccountType').textContent=pr?'Premium':'Free';$('settingsPremiumExpiry').textContent=pr?(expiry(profile?.subscription_expires_at)||'Active'):'Not Active';$('profileFullName').value=profile?.full_name||n;$('profileProgramme').value=profile?.programme||'';$('profileLevel').value=profile?.level||''}function setProfileEditMode(on){['profileFullName','profileProgramme','profileLevel'].forEach(id=>{const el=$(id);if(el)el.readOnly=!on});$('profileForm')?.classList.toggle('profile-readonly',!on);$('profileEditActions')?.classList.toggle('hidden',!on);$('editProfileBtn')?.classList.toggle('hidden',on)}$('editProfileBtn')?.addEventListener('click',()=>setProfileEditMode(true));$('cancelProfileEditBtn')?.addEventListener('click',()=>{renderProfile();setProfileEditMode(false)});
