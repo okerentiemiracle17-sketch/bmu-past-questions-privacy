@@ -409,7 +409,7 @@ async function nexusUploadPracticeFiles(files,format,count,topic){
    allocations.push({idx,allocation});slots-=allocation;
   }
   if(!allocations.length)break;
-  const jobs=allocations.map(async job=>{
+  const jobs=allocations.map(job=>async()=>{
    const i=job.idx;attempts[i]++;
    const covered=valid.slice(-12).map(q=>String(q.question||'').slice(0,100));
    const body={action:'generate',format,count:job.allocation,topic:topic+' — source '+(i+1)+': '+files[i].name+(covered.length?'. Do not repeat these questions: '+JSON.stringify(covered).slice(0,1300):''),...parts[i]};
@@ -420,7 +420,7 @@ async function nexusUploadPracticeFiles(files,format,count,topic){
   // Work in groups of two to avoid overloading the AI provider.
   let gained=0;
   for(let offset=0;offset<jobs.length;offset+=2){
-   const batch=await Promise.allSettled(jobs.slice(offset,offset+2));
+   const batch=await Promise.allSettled(jobs.slice(offset,offset+2).map(run=>run()));
    for(const outcome of batch){
     if(outcome.status==='rejected'){lastError=outcome.reason?.message||'AI service unavailable';continue}
     for(const q of outcome.value){
