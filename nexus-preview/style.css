@@ -796,3 +796,39 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
   #dashboard .quick-tools{grid-template-columns:minmax(0,1fr)!important}
   #dashboard .quick-tool{min-height:74px!important}
 }
+
+
+/* PC dashboard: lock the navigation rail to the viewport.
+   Only the study page follows the browser's vertical scroll.
+   The rail can still scroll internally when its menu exceeds screen height. */
+@media (min-width: 821px) {
+  #dashboard.dashboard {
+    display:block!important;
+    min-height:100dvh!important;
+    position:relative!important;
+  }
+  #dashboard .dashboard-sidebar {
+    position:fixed!important;
+    top:0!important;
+    bottom:0!important;
+    left:0!important;
+    right:auto!important;
+    width:244px!important;
+    max-width:244px!important;
+    height:100dvh!important;
+    max-height:100dvh!important;
+    overflow-x:hidden!important;
+    overflow-y:auto!important;
+    z-index:90!important;
+    overscroll-behavior-y:contain;
+    scrollbar-width:none;
+  }
+  #dashboard .dashboard-content {
+    position:relative!important;
+    display:block!important;
+    margin-left:244px!important;
+    width:calc(100% - 244px)!important;
+    max-width:calc(100% - 244px)!important;
+    min-height:100dvh!important;
+  }
+}
