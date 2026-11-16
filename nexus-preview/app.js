@@ -1090,3 +1090,37 @@ try{renderNexusHistory();setProfileEditMode(false)}catch(e){console.warn(e)}
  const label=`${code}${title?' — '+title:''} • ${format} • ${count} questions • ${minutes} min • Nexus AI`;
  const preview=$('roomSelectionPreview')?.querySelector('span');if(preview)preview.textContent=label;
 }));
+
+
+/* Launch feedback and privacy-conscious monitoring. No passwords or AI contents are logged. */
+$('websiteFeedbackForm')?.addEventListener('submit',async e=>{
+ e.preventDefault();const btn=$('websiteFeedbackSubmit'),status=$('websiteFeedbackStatus');
+ const category=$('websiteFeedbackCategory')?.value||'other';
+ const message=$('websiteFeedbackMessage')?.value.trim()||'';
+ if(message.length<10||message.length>3000){msg(status,'Please enter 10–3000 characters describing the issue.','error');return}
+ if(!user){msg(status,'Please sign in before sending feedback.','error');return}
+ btn.disabled=true;msg(status,'Sending feedback…');
+ try{
+  const {error}=await supabaseClient.from('website_feedback').insert({category,message,page_name:'profile'});
+  if(error)throw error;
+  $('websiteFeedbackMessage').value='';
+  msg(status,'Feedback received. Thank you for helping improve Nexus BMU.','success');
+ }catch(e2){console.warn('Feedback submission unavailable');msg(status,'Unable to send feedback right now. Please use the support email in the website footer.','error')}
+ finally{btn.disabled=false}
+});
+(function installWebsiteErrorMonitoring(){
+ let sent=0,windowStart=Date.now(),seen=new Set();
+ function record(type,input){
+  if(!user?.id||!navigator.onLine)return;
+  if(Date.now()-windowStart>3600000){windowStart=Date.now();sent=0;seen.clear()}
+  if(sent>=5)return;
+  // Deliberately do not capture exception text, URLs, tokens, stack traces or form inputs.
+  const allowed=String(type)==='promise_rejection'?'promise_rejection':'js_error';
+  const key=allowed+':client';
+  if(seen.has(key))return;
+  seen.add(key);sent++;
+  supabaseClient.from('website_error_events').insert({event_type:allowed,message:'Uncaught client-side error (details excluded)',page_name:'website'}).then(({error})=>{if(error)console.warn('Website monitoring unavailable')}).catch(()=>{});
+ }
+ window.addEventListener('error',()=>record('js_error'));
+ window.addEventListener('unhandledrejection',()=>record('promise_rejection'));
+})();
