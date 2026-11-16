@@ -1291,3 +1291,66 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 @media(max-width:600px){
  #dashboard .review-original-question{padding:12px;font-size:14px}
 }
+
+
+/* 2026-11 release: phone-sized Android Chrome / iPhone Safari safeguards.
+   Scoped to authenticated pages to preserve desktop and public landing layouts. */
+#dashboard .dashboard-content,
+#dashboard .dashboard-page,
+#dashboard .quiz-shell,
+#dashboard .study-room-lobby,
+#dashboard .study-room-main-card,
+#dashboard .participants-card,
+#dashboard .result-card,
+#dashboard .past-paper-panel,
+#dashboard .solo-main,
+#dashboard .solo-leader-panel,
+#dashboard .spectate-question-card {
+ min-width:0;
+ max-width:100%;
+}
+#dashboard :is(.group-review-question,.review-original-question,.spectate-question-card h3,.group-answer-review p,.review-box p,.option-button,.spectate-choice){
+ overflow-wrap:anywhere;
+}
+#dashboard :is(.group-theory-answer,#theoryAnswer,#groupTheoryAnswer){max-width:100%;resize:vertical}
+@media(max-width:700px){
+ #dashboard .dashboard-content{min-width:0!important;max-width:100vw!important}
+ #dashboard .dashboard-page{width:100%;max-width:100%;min-width:0}
+ #dashboard :is(.study-room-lobby,.solo-layout,.materials-layout,.nexus-pro-layout,.results-summary-grid,.form-grid){
+  grid-template-columns:minmax(0,1fr)!important;
+ }
+ #dashboard :is(.study-room-main-card,.participants-card,.result-card,.question-card,.setup-card,.past-paper-panel){
+  padding:clamp(13px,4vw,20px)!important;
+ }
+ #dashboard .quiz-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px!important}
+ #dashboard .quiz-topbar>div{min-width:0}
+ #dashboard .quiz-status{gap:12px;flex-wrap:wrap;min-width:0}
+ #dashboard .quiz-topbar strong{overflow-wrap:anywhere}
+ #dashboard :is(.quiz-actions,.quiz-actions-right,.past-paper-actions){width:100%;max-width:100%;flex-wrap:wrap}
+ #dashboard .quiz-actions>div{max-width:100%;min-width:0}
+ #dashboard .quiz-actions-right{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #dashboard :is(.quiz-actions,.quiz-actions-right) button{min-width:0;min-height:44px;white-space:normal}
+ #dashboard .participant-item{flex-wrap:wrap;align-items:center}
+ #dashboard .participant-item button{max-width:100%;min-height:44px;white-space:normal}
+ #dashboard :is(.spectate-screen-header,.spectate-screen-footer){flex-wrap:wrap;gap:9px}
+ #dashboard .spectate-counter{white-space:nowrap}
+ #dashboard .spectate-choice{align-items:flex-start;flex-wrap:wrap}
+ #dashboard .spectate-selected-label{margin-left:0}
+ #dashboard .spectate-emoji{min-width:44px;min-height:44px}
+ #dashboard .group-answer-review-list{min-width:0}
+ #dashboard .group-answer-review{padding:14px!important}
+ #dashboard .past-paper-controls{grid-template-columns:minmax(0,1fr)!important}
+ #dashboard :is(input,select,textarea){max-width:100%;box-sizing:border-box}
+}
+@media(max-width:400px){
+ #dashboard .quiz-actions-right{grid-template-columns:minmax(0,1fr)}
+ #dashboard .spectate-emoji-bar{gap:6px}
+ #dashboard .spectate-emoji{width:44px;height:44px}
+ #dashboard .group-answer-review{padding:12px!important}
+ #dashboard .quiz-status{width:100%;justify-content:space-between}
+}
+@supports(-webkit-touch-callout:none){
+ #dashboard :is(input,textarea,select){font-size:max(16px,1rem)}
+ #dashboard :is(button,input,select,textarea){-webkit-tap-highlight-color:transparent}
+ #dashboard .dashboard-sidebar{-webkit-overflow-scrolling:touch}
+}
