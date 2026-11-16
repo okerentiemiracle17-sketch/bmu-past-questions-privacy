@@ -542,7 +542,7 @@ async function studyAiFilePart(file){
  if(file.size>10*1024*1024)throw new Error('Each uploaded file must be 10 MB or smaller.');
  const name=file.name.toLowerCase();
  if(name.endsWith('.txt')||file.type==='text/plain')return{source_text:await file.text()};
- if(!/\\.(pdf|png|jpe?g)$/.test(name))throw new Error('Only PDF, TXT, PNG and JPG files are supported.');
+ if(!/[.](pdf|png|jpe?g)$/.test(name))throw new Error('Only PDF, TXT, PNG and JPG files are supported.');
  const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
  for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
  return{file_base64:btoa(binary),mime_type:name.endsWith('.pdf')?'application/pdf':name.endsWith('.png')?'image/png':'image/jpeg'};
