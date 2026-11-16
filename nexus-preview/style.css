@@ -669,7 +669,7 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
 /* Nexus mobile app shell: full-width reading area with horizontal bottom navigation.
    Replaces the narrow fixed left rail only on small touch screens. */
 @media (max-width: 700px) {
-  #dashboard.dashboard {
+  #dashboard.dashboard:not(.hidden) {
     display:block!important;
     width:100%!important;
     max-width:100vw!important;
@@ -802,7 +802,7 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
    Only the study page follows the browser's vertical scroll.
    The rail can still scroll internally when its menu exceeds screen height. */
 @media (min-width: 821px) {
-  #dashboard.dashboard {
+  #dashboard.dashboard:not(.hidden) {
     display:block!important;
     min-height:100dvh!important;
     position:relative!important;
@@ -1008,3 +1008,11 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
 @media (prefers-reduced-motion:reduce){
   #dashboard .dashboard-sidebar{scroll-behavior:auto!important}
 }
+
+
+/* Critical route visibility: public marketing site and authenticated dashboard
+   must never render together. Dashboard layout rules must not override .hidden. */
+#dashboard.hidden,
+#publicWebsite.hidden,
+.topbar.hidden,
+footer.hidden{display:none!important}
