@@ -1045,3 +1045,72 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
 #publicWebsite.hidden,
 .topbar.hidden,
 footer.hidden{display:none!important}
+
+
+/* 2026-11-16: accessible contrast for Study Group, Solo and Past Question reviews.
+   All surfaces and text use the same light/dark theme tokens. */
+#dashboard .group-answer-review,
+#dashboard #groupAnswerReview .group-answer-review {
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+  border:1px solid var(--border)!important;
+}
+#dashboard .group-answer-review :is(strong,b,h4),
+#dashboard .group-answer-review-list .group-answer-review :is(strong,b,h4) {
+  color:var(--text)!important;
+}
+#dashboard .group-answer-review p,
+#dashboard .group-answer-review-list .group-answer-review p {
+  color:var(--soft)!important;
+  opacity:1!important;
+}
+#dashboard .group-answer-review p :is(strong,b) {
+  color:var(--text)!important;
+}
+#dashboard .review-box,
+#dashboard #reviewBox,
+#dashboard #theoryReviewBox,
+#dashboard #groupReviewBox {
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+  border:1px solid var(--border)!important;
+}
+#dashboard .review-box :is(h3,h4,strong,b),
+#dashboard #groupReviewBox :is(h3,h4,strong,b) {
+  color:var(--text)!important;
+}
+#dashboard .review-box p,
+#dashboard #groupReviewBox p {
+  color:var(--soft)!important;
+  opacity:1!important;
+}
+#dashboard .theory-review-list div {
+  background:var(--surface)!important;
+  color:var(--text)!important;
+  border-color:var(--border)!important;
+}
+#dashboard .question-card .option-button,
+#dashboard #groupMcqOptions .option-button {
+  color:var(--text)!important;
+  background:var(--surface2)!important;
+  border-color:var(--border)!important;
+}
+#dashboard .question-card .option-button.selected,
+#dashboard #groupMcqOptions .option-button.selected {
+  background:var(--brand-soft)!important;
+  border-color:var(--brand)!important;
+}
+#dashboard .question-card .option-button :is(span,strong),
+#dashboard #groupMcqOptions .option-button :is(span,strong) {
+  color:inherit;
+}
+#dashboard .question-card .option-button.selected .option-key,
+#dashboard #groupMcqOptions .option-button.selected .option-key {
+  background:var(--brand)!important;
+  color:#fff!important;
+}
+#dashboard .question-navigator .question-chip:not(.active),
+#dashboard .theory-navigator .question-chip:not(.active) {
+  color:var(--text)!important;
+  background:var(--surface2)!important;
+}
