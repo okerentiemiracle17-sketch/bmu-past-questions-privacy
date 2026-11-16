@@ -359,6 +359,25 @@ function loadNexusHistory(){try{return JSON.parse(localStorage.getItem(NEXUS_HIS
 function saveNexusHistory(rows){localStorage.setItem(NEXUS_HISTORY_KEY,JSON.stringify(rows.slice(0,40)))}
 function renderNexusHistory(){const el=$('nexusHistoryList');if(!el)return;const rows=loadNexusHistory();el.innerHTML=rows.length?'':'<div class="history-empty">Your previous Nexus AI questions will appear here.</div>';rows.forEach((x,i)=>{const b=document.createElement('button');b.type='button';b.className='nexus-history-item';b.innerHTML=`<strong>${esc((x.question||'Conversation').slice(0,55))}</strong><small>${esc(x.when||'Previous')}</small>`;b.onclick=()=>{const c=$('nexusConversation');c.innerHTML='';addChat('You',x.question,'user-message');addChat('Nexus AI',x.answer,'ai-message')};el.appendChild(b)})}
 function rememberNexus(q,a){const rows=loadNexusHistory();rows.unshift({question:q,answer:a,when:new Date().toLocaleString()});saveNexusHistory(rows);renderNexusHistory()}
+// Missing course fallback: keep academic catalogue separate from AI practice.
+function openMissingCourseNexus(mode,fromSolo=false){
+ const dept=fromSolo?$('soloDepartmentFilter')?.value:$('pastPaperDepartment')?.value;
+ const level=fromSolo?$('soloLevelFilter')?.value:$('pastPaperLevel')?.value;
+ const code=fromSolo?s($('soloManualCode')?.value).trim().toUpperCase():s($('pastPaperCourse')?.value).trim();
+ const title=fromSolo?s($('soloManualName')?.value).trim():'';
+ const context=[dept,level?level+' Level':'',code,title].filter(Boolean).join(' • ');
+ go('nexus-ai');setNexusMode(mode);
+ if(mode==='upload'){
+  $('nexusUploadTopic').value=context||'Enter your course code and title';
+  $('nexusUploadFile')?.focus();
+ }else{
+  $('nexusGeneratePrompt').value=context?'Prepare accurate university-level practice questions for '+context+'. Stay within the specified course; these are AI practice, not official past papers.':'Enter the course code and name to generate course-specific practice questions.';
+  $('nexusGeneratePrompt')?.focus();
+ }
+}
+$('pastPaperAiFallback')?.addEventListener('click',()=>openMissingCourseNexus('generate'));
+$('pastPaperUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload'));
+$('soloUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload',true));
 function setNexusMode(mode){document.querySelectorAll('.nexus-mode').forEach(b=>b.classList.toggle('active',b.dataset.nexusMode===mode));$('nexusChatMode')?.classList.toggle('hidden',mode!=='chat');$('nexusGenerateMode')?.classList.toggle('hidden',mode!=='generate');$('nexusUploadMode')?.classList.toggle('hidden',mode!=='upload')}
 document.querySelectorAll('.nexus-mode').forEach(b=>b.addEventListener('click',()=>setNexusMode(b.dataset.nexusMode)));
 $('newNexusChatBtn')?.addEventListener('click',()=>{$('nexusConversation').innerHTML='<div class="ai-message"><strong>Nexus AI</strong><p>New conversation. What would you like to study?</p></div>';setNexusMode('chat')});
