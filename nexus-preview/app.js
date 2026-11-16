@@ -550,33 +550,47 @@ async function studyAiFilePart(file){
 async function generateValidatedStudyRoomQuestions(format,courseCode,courseTitle,count,files=[]){
  const all=[],seen=new Set(),parts=[];
  for(const file of files)parts.push(await studyAiFilePart(file));
- const attemptCap=Math.min(32,Math.max(10,count*2)),base=studyAiTopic(format,courseCode,courseTitle);
- let emptyRounds=0,lastError='';
- for(let round=0;round<attemptCap&&all.length<count;round++){
-  const remaining=count-all.length,n=Math.min(format==='theory'?3:5,remaining);
-  // Rotate through source files; never add out-of-source web questions to an uploaded-material room.
-  const source=parts.length?parts[round%parts.length]:null;
-  const recent=all.slice(-12).map(q=>s(q.question).slice(0,110));
-  const topic=base+(recent.length?' Avoid repeating these previously accepted questions: '+JSON.stringify(recent).slice(0,1800):'');
-  try{
-   msg($('studyRoomLobbyMessage'),`Preparing ${all.length} of ${count} valid ${format.toUpperCase()} questions…`,'info');
-   const body={action:source?'generate':'web_generate',format,count:n,topic,...(source||{})};
-   const result=await supabaseClient.functions.invoke('ai-question-generator',{body});
-   if(result.error||result.data?.error)throw new Error(result.data?.message||result.error?.message||'AI generator temporarily unavailable');
-   const rows=result.data?.result?.questions;
-   if(!Array.isArray(rows))throw new Error('AI did not return a question list');
-   let added=0;
-   for(const q of rows){
+ const base=studyAiTopic(format,courseCode,courseTitle);
+ // Run at most two independent requests concurrently. Parallel small batches
+ // finish faster than waiting for each batch, without unbounded provider calls.
+ const maxBatch=format==='theory'?3:5,attemptCap=Math.min(24,Math.max(8,Math.ceil(count/maxBatch)*4));
+ let round=0,attempts=0,emptyRounds=0,lastError='';
+ while(all.length<count&&attempts<attemptCap&&emptyRounds<5){
+  const remaining=count-all.length;
+  const jobs=Math.min(2,Math.ceil(remaining/maxBatch),attemptCap-attempts);
+  const recent=all.slice(-16).map(q=>s(q.question).slice(0,120));
+  let assigned=0;
+  const requests=Array.from({length:jobs},(_,index)=>{
+   const n=Math.min(maxBatch,remaining-assigned);assigned+=n;
+   const source=parts.length?parts[(round*2+index)%parts.length]:null;
+   const topic=base+(recent.length?' Do not repeat these questions: '+JSON.stringify(recent).slice(0,2000):'')+
+    (jobs>1?' Produce a distinct question set for batch '+(index+1)+'; avoid common repeated examples.':'');
+   return {n,source,topic};
+  });
+  attempts+=jobs;round++;
+  msg($('studyRoomLobbyMessage'),`Preparing ${all.length} of ${count} valid ${format.toUpperCase()} questions…`,'info');
+  const results=await Promise.allSettled(requests.map(async job=>{
+   const body={action:job.source?'generate':'web_generate',format,count:job.n,topic:job.topic,...(job.source||{})};
+   const response=await supabaseClient.functions.invoke('ai-question-generator',{body});
+   if(response.error||response.data?.error)throw new Error(response.data?.message||response.error?.message||'AI generator temporarily unavailable');
+   if(!Array.isArray(response.data?.result?.questions))throw new Error('AI did not return a question list');
+   return response.data.result.questions;
+  }));
+  let added=0;
+  for(const result of results){
+   if(result.status==='rejected'){lastError=result.reason?.message||'AI request failed';continue}
+   for(const q of result.value){
     if(!validStudyAiQuestion(q,format))continue;
-    const key=studyAiQuestionKey(q);if(!key||seen.has(key))continue;
+    const key=studyAiQuestionKey(q);
+    if(!key||seen.has(key))continue;
     seen.add(key);all.push(q);added++;
-    if(all.length===count)break;
+    if(all.length>=count)break;
    }
-   emptyRounds=added?0:emptyRounds+1;
-  }catch(error){lastError=error?.message||'AI request failed';emptyRounds++}
-  if(emptyRounds>=6)break; // Fail clearly instead of repeating indefinitely.
+   if(all.length>=count)break;
+  }
+  emptyRounds=added?0:emptyRounds+1;
  }
- if(all.length<count)throw new Error(`Nexus AI produced ${all.length} of ${count} unique, valid questions. No session was started. ${lastError?'Last issue: '+lastError+'. ':''}Try fewer questions or clearer course materials.`);
+ if(all.length<count)throw new Error(`Nexus AI prepared ${all.length} of ${count} unique, valid questions. The room has not started. ${lastError?'Last provider issue: '+lastError+'. ':''}Please try a smaller set or provide clearer material.`);
  return all.slice(0,count);
 }
 
