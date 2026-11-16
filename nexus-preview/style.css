@@ -894,3 +894,36 @@ body.dark #dashboard .notices-panel .notice-item p{color:#e2e8f0!important}
  #dashboard .dashboard-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:100px}
  #dashboard .dashboard-content::-webkit-scrollbar-track{background:transparent}
 }
+
+
+/* Desktop: sidebar must scroll to Help & Support and Sign Out.
+   Ensure flex children cannot shrink into a clipped fixed-height rail. */
+@media (min-width:821px){
+ #dashboard .dashboard-sidebar{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+  overflow-y:scroll!important;
+  overflow-x:hidden!important;
+  min-height:0!important;
+  height:100dvh!important;
+  max-height:100dvh!important;
+  padding-bottom:24px!important;
+  scrollbar-width:thin!important;
+  scrollbar-color:#777781 transparent!important;
+  scrollbar-gutter:stable!important;
+  overscroll-behavior-y:contain;
+ }
+ #dashboard .dashboard-sidebar::-webkit-scrollbar{display:block!important;width:7px!important}
+ #dashboard .dashboard-sidebar::-webkit-scrollbar-thumb{background:#777781!important;border-radius:10px!important}
+ #dashboard .dashboard-sidebar::-webkit-scrollbar-track{background:transparent!important}
+ #dashboard .dashboard-sidebar > .dashboard-brand,
+ #dashboard .dashboard-sidebar > .dashboard-menu,
+ #dashboard .dashboard-sidebar > .nexus-sidebar-help,
+ #dashboard .dashboard-sidebar > .sidebar-plan,
+ #dashboard .dashboard-sidebar > .logout-btn{
+  flex-shrink:0!important;
+ }
+ #dashboard .dashboard-sidebar > .sidebar-plan{margin-top:12px!important}
+ #dashboard .dashboard-sidebar > .logout-btn{margin-bottom:8px!important}
+}
