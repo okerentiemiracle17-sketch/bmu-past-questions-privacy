@@ -81,9 +81,6 @@ function refreshPastPaperLevels(){
  const prior=lv.value;
  lv.innerHTML='<option value="">Choose level</option>';
  if(dept){
-  const hasDepartmentCourses=courses.some(c=>pastPaperDept(c)===dept);
-  const status=$('pastPaperMessage');
-  if(status)msg(status,hasDepartmentCourses?'':`No department-specific courses have been catalogued for ${dept} yet. Shared university courses may still be available; use Random Practice to enter another course code.`,hasDepartmentCourses?'info':'info');
   const levels=[...new Set(pastPaperScopedCourses().map(pastPaperLevel))].filter(Boolean).sort((a,b)=>(parseInt(a)||999)-(parseInt(b)||999));
   levels.forEach(value=>lv.add(new Option(/^\d+$/.test(value)?`${value} Level`:value,value)));
   if(levels.includes(prior))lv.value=prior;
@@ -92,6 +89,7 @@ function refreshPastPaperLevels(){
  if(!lv.value){sem.value='';sem.disabled=true}
  else sem.disabled=false;
  refreshPastPaperCourseOptions();
+ if(dept&&!courses.some(c=>pastPaperDept(c)===dept))msg($('pastPaperMessage'),`No department-specific courses are currently catalogued for ${dept}. Shared university courses may still appear. You can use Random Practice for other courses.`, 'info');
 }
 function refreshPastPaperCourseOptions(){
  const dept=$('pastPaperDepartment')?.value||'',lv=$('pastPaperLevel')?.value||'',sem=$('pastPaperSemester')?.value||'',el=$('pastPaperCourse');
