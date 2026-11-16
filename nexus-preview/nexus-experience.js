@@ -111,13 +111,111 @@ document.addEventListener('pointerdown',e=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBell()});
 window.addEventListener('resize',panelPosition,{passive:true});
 window.addEventListener('scroll',panelPosition,{passive:true,capture:true});
-async function syncAdmin(){const publisher=$('nexusAdminPublisher');if(!publisher)return;publisher.classList.add('hidden');try{const {data,error}=await supabaseClient.rpc('is_app_admin');if(!error&&data===true)publisher.classList.remove('hidden')}catch(e){console.warn('Admin status unavailable',e)}}
-$('nexusPublishForm')?.addEventListener('submit',async e=>{e.preventDefault();const status=$('nexusPublishStatus');const btn=$('nexusPublishButton');btn.disabled=true;status.textContent='Publishing…';try{
-const check=await supabaseClient.rpc('is_app_admin');if(check.error||check.data!==true)throw new Error('Only authorized administrators can publish announcements.');
-const title=$('nexusPostTitle').value.trim(),message=$('nexusPostMessage').value.trim();if(!title||!message)throw new Error('Title and message are required.');
-const {error}=await supabaseClient.from('app_notifications').insert({title,message,category:'school',published:true,target_level:null});if(error)throw error;
-$('nexusPublishForm').reset();status.textContent='Announcement published to the website and student dashboard.';await Promise.all([publicNews(),loadDashboardNotices()]);if(typeof loadNotices==='function')loadNotices();
-}catch(err){status.textContent=err.message||'Publishing failed.'}finally{btn.disabled=false}});
+// Admin announcements: keep all uploads restricted by Supabase admin policies.
+const MAX_NOTICE_PHOTOS=6, MAX_NOTICE_BYTES=5*1024*1024;
+let noticePreviewUrls=[];
+function releaseNoticePreviews(){
+ noticePreviewUrls.forEach(url=>URL.revokeObjectURL(url));noticePreviewUrls=[];
+ const box=$('nexusPostImagePreview');if(box){box.replaceChildren();box.classList.add('hidden')}
+ const count=$('nexusPostImageCount');if(count)count.textContent='No photos selected';
+}
+function validateNoticePhotos(files){
+ if(files.length>MAX_NOTICE_PHOTOS)throw new Error('Choose no more than 6 pictures.');
+ for(const file of files){
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Only JPG, PNG or WebP photos are supported.');
+  if(file.size>MAX_NOTICE_BYTES)throw new Error('Each photo must be 5 MB or smaller: '+file.name);
+ }
+}
+$('nexusPostImage')?.addEventListener('change',()=>{
+ releaseNoticePreviews();const input=$('nexusPostImage'),files=[...(input?.files||[])];
+ try{validateNoticePhotos(files)}catch(e){input.value='';const status=$('nexusPublishStatus');if(status)status.textContent=e.message;return}
+ const box=$('nexusPostImagePreview');if(!box||!files.length)return;
+ box.classList.remove('hidden');$('nexusPostImageCount').textContent=files.length+' photo'+(files.length===1?'':'s')+' selected';
+ files.forEach((file,i)=>{
+  const url=URL.createObjectURL(file);noticePreviewUrls.push(url);
+  const card=document.createElement('div');card.className='nexus-photo-preview';
+  const img=document.createElement('img');img.src=url;img.alt='Selected photo '+(i+1);
+  const caption=document.createElement('small');caption.textContent=file.name;
+  card.append(img,caption);box.appendChild(card)
+ });
+});
+async function ensureNoticeAdmin(){
+ const {data,error}=await supabaseClient.rpc('is_app_admin');
+ if(error||data!==true)throw new Error('Only authorized administrators may manage announcements.');
+}
+async function listAdminNotices(){
+ const box=$('nexusAdminNotices');if(!box)return;
+ box.textContent='Loading announcements…';
+ const {data,error}=await supabaseClient.from('app_notifications').select('id,title,created_at,published,attachment_path,attachment_paths').order('created_at',{ascending:false}).limit(60);
+ if(error){box.textContent='Cannot load announcements: '+error.message;return}
+ box.replaceChildren();
+ if(!data?.length){box.textContent='No announcements yet.';return}
+ for(const record of data){
+  const row=document.createElement('div');row.className='nexus-admin-notice-row';
+  const description=document.createElement('div'),name=document.createElement('strong'),date=document.createElement('small');
+  name.textContent=record.title||'Untitled';
+  date.textContent=(record.created_at?fmt(record.created_at):'')+' • '+(record.published?'Published':'Unpublished');
+  description.append(name,date);
+  const del=document.createElement('button');del.type='button';del.className='nexus-admin-delete';del.textContent='Delete';
+  del.addEventListener('click',async()=>{
+   if(!confirm('Permanently delete announcement: '+(record.title||'Untitled')+'?'))return;
+   del.disabled=true;
+   try{
+    await ensureNoticeAdmin();
+    const {error:deleteError}=await supabaseClient.from('app_notifications').delete().eq('id',record.id);
+    if(deleteError)throw deleteError;
+    const paths=[...new Set([...(Array.isArray(record.attachment_paths)?record.attachment_paths:[]),record.attachment_path].filter(Boolean))];
+    if(paths.length){const result=await supabaseClient.storage.from('notification-attachments').remove(paths);if(result.error)console.warn('Announcement storage cleanup:',result.error.message)}
+    await Promise.all([listAdminNotices(),publicNews(),loadDashboardNotices()]);
+    if(typeof loadNotices==='function')loadNotices();
+   }catch(err){alert(err.message||'Could not delete announcement.');del.disabled=false}
+  });
+  row.append(description,del);box.append(row);
+ }
+}
+async function syncAdmin(){
+ const panel=$('nexusAdminPublisher');if(!panel)return;panel.classList.add('hidden');
+ try{await ensureNoticeAdmin();panel.classList.remove('hidden');await listAdminNotices()}
+ catch(error){console.warn('Admin access unavailable:',error.message)}
+}
+$('nexusPublishForm')?.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const status=$('nexusPublishStatus'),button=$('nexusPublishButton'),files=[...($('nexusPostImage')?.files||[])],paths=[];
+ button.disabled=true;status.textContent='Publishing…';let inserted=false;
+ try{
+  await ensureNoticeAdmin();validateNoticePhotos(files);
+  const title=$('nexusPostTitle').value.trim(),message=$('nexusPostMessage').value.trim();
+  if(!title||!message)throw new Error('Enter a title and announcement message.');
+  const urls=[];
+  for(let i=0;i<files.length;i++){
+   const file=files[i],suffix=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
+   const path='nexus-announcements/'+crypto.randomUUID()+'.'+suffix;
+   status.textContent='Uploading image '+(i+1)+' of '+files.length+'…';
+   const {error:uploadError}=await supabaseClient.storage.from('notification-attachments').upload(path,file,{contentType:file.type,upsert:false});
+   if(uploadError)throw uploadError;
+   paths.push(path);
+   urls.push(supabaseClient.storage.from('notification-attachments').getPublicUrl(path).data.publicUrl);
+  }
+  const first=files[0];
+  const {error:insertError}=await supabaseClient.from('app_notifications').insert({
+    title,message,category:'school',published:true,target_level:null,
+    attachment_url:urls[0]||null,attachment_urls:urls,
+    attachment_path:paths[0]||null,attachment_paths:paths,
+    attachment_name:first?.name||null,attachment_type:first?'image':null,attachment_mime:first?.type||null
+  });
+  if(insertError)throw insertError;inserted=true;
+  $('nexusPublishForm').reset();releaseNoticePreviews();
+  status.textContent='Announcement published successfully.';
+  await Promise.all([publicNews(),loadDashboardNotices(),listAdminNotices()]);
+  if(typeof loadNotices==='function')loadNotices();
+ }catch(err){
+  if(!inserted&&paths.length){
+   const cleanup=await supabaseClient.storage.from('notification-attachments').remove(paths);
+   if(cleanup.error)console.warn('Unable to clean up unpublished attachments:',cleanup.error.message);
+  }
+  status.textContent=err.message||'Publishing failed.';
+ }finally{button.disabled=false}
+});
 let lastId='';async function checkAuth(){if(!isDash()){currentUser=null;lastId='';return}try{const {data:{user},error}=await supabaseClient.auth.getUser();if(error||!user)return;currentUser=user;if(lastId===user.id)return;lastId=user.id;await Promise.all([loadDashboardNotices(),syncAdmin()]);}catch(e){console.warn('Notification load',e)}}
 new MutationObserver(checkAuth).observe($('dashboard'),{attributes:true,attributeFilter:['class']});
 supabaseClient.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'){currentUser=null;lastId='';notices=[];redrawBell();$('nexusAdminPublisher')?.classList.add('hidden')}else if(event==='SIGNED_IN')setTimeout(checkAuth,0)});
