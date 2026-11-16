@@ -456,16 +456,72 @@ function enterRoom(r,host){groupSelectedAnswers.clear();roomData=r;isHost=host;$
 function updateRoomSetupSummary(){if(!roomData)return;const summary=`${roomData.selected_course||'Course not selected'} • ${(roomData.question_format||'mcq').toUpperCase()} • ${roomData.total_questions||10} questions • ${roomData.time_limit_minutes||30} min`;if($('participantSetupSummary'))$('participantSetupSummary').textContent=summary;if($('roomSelectionPreview'))$('roomSelectionPreview').querySelector('span').textContent=summary}
 let lastParticipantIds=[];
 async function loadParticipants(){if(!roomData)return;try{let rows=[];const direct=await supabaseClient.from('study_room_members').select('user_id,display_name,is_host,ready,finished,finished_at,answered_count,left_at').eq('room_id',roomData.id).is('left_at',null).order('joined_at');if(!direct.error)rows=direct.data||[];else{const r=await supabaseClient.rpc('get_study_room_participants',{p_room_id:roomData.id});if(r.error)throw r.error;rows=(r.data||[]).filter(x=>!x.left_at)}const ids=rows.map(x=>x.user_id);if(lastParticipantIds.length&&ids.length<lastParticipantIds.length)msg($('studyRoomLobbyMessage'),'A participant has left the study group.','info');lastParticipantIds=ids;$('participantCount').textContent=`${rows.length} online`;$('participantList').innerHTML='';const me=rows.find(x=>x.user_id===user.id);rows.forEach(r=>{const d=document.createElement('div');d.className='participant-item';const state=r.finished?roomFinishLabel(r.finished_at):(r.ready?'Ready':'Not ready');d.innerHTML=`<strong>${esc(r.display_name||'Student')}${r.is_host?' • Host':''}</strong><span class="${r.ready?'participant-ready':'participant-not-ready'}">${esc(state)}${r.finished?'':` • ${r.answered_count||0} answered`}</span>`;if(me?.finished&&!r.finished&&r.user_id!==user.id){const b=document.createElement('button');b.type='button';b.className='secondary-btn';b.textContent='Request to spectate';b.onclick=()=>requestSpectate(r.user_id,r.display_name);d.appendChild(b)}$('participantList').appendChild(d)});if($('participantReadyBtn')){$('participantReadyBtn').textContent=me?.ready?'Ready ✓':'I’m Ready';$('participantReadyBtn').disabled=!!me?.ready}if(isHost&&$('startStudyRoomBtn')){const unready=rows.filter(x=>!x.is_host&&!x.ready);$('startStudyRoomBtn').disabled=unready.length>0;$('startStudyRoomBtn').textContent=unready.length?`Waiting for ${unready.length} participant${unready.length===1?'':'s'}`:'Start Session'}return rows}catch(e2){console.warn(e2);return[]}}
-async function syncSpectateRequests(){if(!roomData)return;try{const r=await supabaseClient.rpc('get_my_pending_spectate_requests',{p_room_id:roomData.id});if(r.error)throw r.error;for(const req of r.data||[]){const ok=confirm(`${req.requester_name||'A finished participant'} wants to spectate your quiz progress.\n\nAllow spectating? They can only watch; they cannot answer or change anything.`);const ans=await supabaseClient.rpc('respond_study_room_spectate',{p_request_id:req.id,p_accept:ok});if(ans.error)throw ans.error;msg($('studyRoomLobbyMessage'),ok?'Spectating allowed.':'Spectating declined.',ok?'success':'info')}}catch(e){console.warn('spectate notification check',e)}}
+async function syncSpectateRequests(){
+ if(!roomData||spectateRequestBusy)return;
+ const roomId=roomData.id;
+ try{
+  const {data,error}=await supabaseClient.rpc('get_my_pending_spectate_requests',{p_room_id:roomId});
+  if(error)throw error;
+  const holder=document.getElementById('spectatePermissionPrompt')||document.createElement('div');
+  holder.id='spectatePermissionPrompt';holder.className='spectate-permission-prompt';
+  if(!holder.isConnected)document.body.appendChild(holder);
+  if(roomData?.id!==roomId)return;
+  const requests=Array.isArray(data)?data:[];
+  if(!requests.length){holder.classList.add('hidden');holder.innerHTML='';holder.dataset.requestId='';return}
+  const req=requests[0];holder.classList.remove('hidden');
+  if(holder.dataset.requestId===req.id&&holder.querySelector('button'))return;
+  holder.dataset.requestId=req.id;
+  holder.innerHTML='<strong>Spectating request</strong><p>'+esc(req.requester_name||'A participant')+' wants to watch your quiz progress. You can continue answering.</p><div class="spectate-actions"><button type="button" data-accept="true">Allow</button><button type="button" data-accept="false">Decline</button></div>';
+  holder.querySelectorAll('button').forEach(button=>button.addEventListener('click',async()=>{
+   if(spectateRequestBusy)return;spectateRequestBusy=true;
+   holder.querySelectorAll('button').forEach(x=>x.disabled=true);
+   try{const response=await supabaseClient.rpc('respond_study_room_spectate',{p_request_id:req.id,p_accept:button.dataset.accept==='true'});
+    if(response.error)throw response.error;
+    holder.dataset.requestId='';holder.classList.add('hidden');holder.innerHTML='';
+   }catch(e){alert(e.message||'Unable to respond to spectating request.')}
+   finally{spectateRequestBusy=false}
+  }));
+ }catch(e){console.warn('spectating permission check',e)}
+}
 async function requestSpectate(targetId,name){try{const r=await supabaseClient.rpc('request_study_room_spectate',{p_room_id:roomData.id,p_target_id:targetId});if(r.error)throw r.error;spectateTargetId=targetId;alert(`Spectate request sent to ${name||'participant'}. You will only see progress if they accept.`);startSpectateStatusPoll()}catch(e){alert(e.message||'Unable to request spectating.')}}
-function startSpectateStatusPoll(){if(spectatePoll)clearInterval(spectatePoll);const tick=async()=>{if(!roomData||!spectateTargetId)return;try{const r=await supabaseClient.rpc('get_my_spectate_request_status',{p_room_id:roomData.id,p_target_id:spectateTargetId});const st=Array.isArray(r.data)?r.data[0]:null;if(!st)return;if(st.status==='accepted'){clearInterval(spectatePoll);spectatePoll=null;await showSpectatorProgress()}else if(st.status==='declined'){clearInterval(spectatePoll);spectatePoll=null;alert(`${st.target_name||'Participant'} declined the spectate request.`)}}catch(e){console.warn(e)}};tick();spectatePoll=setInterval(tick,2000)}
-async function showSpectatorProgress(){if(!roomData||!spectateTargetId)return;try{const r=await supabaseClient.rpc('get_consented_spectator_progress',{p_room_id:roomData.id,p_target_id:spectateTargetId});if(r.error)throw r.error;const el=$('spectateLivePanel');if(!el)return;const rows=r.data||[];el.classList.remove('hidden');el.innerHTML=`<strong>Live spectating • read only</strong><p>${rows.length} answer${rows.length===1?'':'s'} submitted so far.</p>`+rows.map(x=>`<div class="spectate-progress-row"><span>Question ${Number(x.question_no)+1}</span><strong>${esc(x.selected_option||'Answered')}</strong></div>`).join('');setTimeout(showSpectatorProgress,2000)}catch(e){console.warn(e)}}
+function startSpectateStatusPoll(){
+ if(spectatePoll)clearInterval(spectatePoll);
+ const tick=async()=>{
+  if(!roomData||!spectateTargetId)return;
+  try{
+   const r=await supabaseClient.rpc('get_my_spectate_request_status',{p_room_id:roomData.id,p_target_id:spectateTargetId});
+   if(r.error)throw r.error;
+   const status=Array.isArray(r.data)?r.data[0]:null;if(!status)return;
+   if(status.status==='accepted'){
+    clearInterval(spectatePoll);spectatePoll=null;
+    await showSpectatorProgress();
+    if(spectateRefreshTimer)clearInterval(spectateRefreshTimer);
+    spectateRefreshTimer=setInterval(()=>{void showSpectatorProgress()},2500);
+   }else if(status.status==='declined'){
+    clearInterval(spectatePoll);spectatePoll=null;
+    alert((status.target_name||'Participant')+' declined the spectating request.');
+   }
+  }catch(e){console.warn('Spectating status check',e)}
+ };
+ void tick();spectatePoll=setInterval(tick,2500);
+}
+async function showSpectatorProgress(){
+ if(!roomData||!spectateTargetId)return;
+ try{
+  const {data,error}=await supabaseClient.rpc('get_consented_spectator_progress',{p_room_id:roomData.id,p_target_id:spectateTargetId});
+  if(error)throw error;const el=$('spectateLivePanel');if(!el)return;
+  const rows=Array.isArray(data)?data:[];
+  el.classList.remove('hidden');
+  el.innerHTML='<strong>Live spectating • read only</strong><p>'+rows.length+' answer(s) submitted.</p>'+
+   rows.map(x=>'<div class="spectate-progress-row"><span>Question '+(Number(x.question_no)+1)+'</span><strong>'+esc(x.selected_option||'Answered')+'</strong></div>').join('');
+ }catch(e){console.warn('Live spectating failed',e)}
+}
 async function syncRoom(){if(!roomData)return;const rows=await loadParticipants();await syncSpectateRequests();try{await supabaseClient.rpc('expire_study_room_if_needed',{p_room_id:roomData.id})}catch{}const {data}=await supabaseClient.from('study_rooms').select('*').eq('id',roomData.id).limit(1);if(!data?.length)return;roomData=data[0];updateRoomSetupSummary();if(roomData.status==='playing'&&$('groupQuizShell').classList.contains('hidden')&&$('groupFinishWaiting')?.classList.contains('hidden'))startGroupQuiz();const active=rows.filter(x=>!x.left_at);if(active.length&&active.every(x=>x.finished))groupResults();if(roomData.status==='finished')groupResults()}
 async function saveRoomConfiguration(){if(!isHost||!roomData||roomData.status!=='waiting')return;const course=$('groupCourse').value;if(!course)return;const r=await supabaseClient.rpc('configure_study_room_secure',{p_room_id:roomData.id,p_course:course,p_format:$('groupQuestionFormat').value,p_count:Number($('groupQuestionCount').value),p_minutes:Number($('groupTimeLimit').value)});if(r.error){msg($('studyRoomLobbyMessage'),r.error.message,'error');return}roomData.selected_course=course;roomData.question_format=$('groupQuestionFormat').value;roomData.total_questions=Number($('groupQuestionCount').value);roomData.time_limit_minutes=Number($('groupTimeLimit').value);updateRoomSetupSummary();loadParticipants()}
 ['groupCourse','groupQuestionFormat','groupQuestionCount','groupTimeLimit'].forEach(id=>$(id)?.addEventListener('change',saveRoomConfiguration));
 $('participantReadyBtn')?.addEventListener('click',async()=>{if(!roomData)return;const r=await supabaseClient.rpc('set_study_room_ready',{p_room_id:roomData.id,p_ready:true});if(r.error){msg($('studyRoomLobbyMessage'),r.error.message,'error');return}loadParticipants()});
 $('startStudyRoomBtn')?.addEventListener('click',async()=>{if(!isHost||!roomData)return;const course=$('groupCourse').value;if(!course){msg($('studyRoomLobbyMessage'),'Choose a course first.','error');return}$('startStudyRoomBtn').disabled=true;try{if(!roomData.selected_course)await saveRoomConfiguration();const r=await supabaseClient.rpc('start_study_room_secure',{p_room_id:roomData.id});if(r.error)throw r.error;await syncRoom()}catch(e2){msg($('studyRoomLobbyMessage'),e2.message||'Could not start room.','error')}finally{loadParticipants()}});
-$('leaveStudyRoomBtn')?.addEventListener('click',leaveRoom);async function leaveRoom(){if(roomData&&!confirm('Quit this study group? Other participants will see that you left.'))return;const rid=roomData?.id;if(rid){try{await supabaseClient.rpc('leave_study_room_secure',{p_room_id:rid})}catch{}}stopRoom();roomData=null;isHost=false;$('studyRoomLobby').classList.add('hidden');$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.add('hidden');$('groupResults').classList.add('hidden');$('studyRoomEntry').classList.remove('hidden');msg($('studyRoomEntryMessage'),'You left the study group.','info')}
+$('leaveStudyRoomBtn')?.addEventListener('click',leaveRoom);async function leaveRoom(){if(roomData&&!confirm('Quit this study group? Other participants will see that you left.'))return;const rid=roomData?.id;if(rid){try{await supabaseClient.rpc('leave_study_room_secure',{p_room_id:rid})}catch{}}stopRoom();groupSelectedAnswers.clear();if(spectatePoll)clearInterval(spectatePoll);spectatePoll=null;if(spectateRefreshTimer)clearInterval(spectateRefreshTimer);spectateRefreshTimer=null;document.getElementById('spectatePermissionPrompt')?.remove();roomData=null;isHost=false;$('studyRoomLobby').classList.add('hidden');$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.add('hidden');$('groupResults').classList.add('hidden');$('studyRoomEntry').classList.remove('hidden');msg($('studyRoomEntryMessage'),'You left the study group.','info')}
 async function startGroupQuiz(){stopRoom();groupTotal=Number(roomData.total_questions)||10;groupFormat=roomData.question_format||'mcq';groupEndsAt=roomData.ends_at?new Date(roomData.ends_at):null;const {data}=await supabaseClient.from('study_room_members').select('score,answered_count').eq('room_id',roomData.id).eq('user_id',user.id).limit(1);const m=data?.[0]||{};groupNo=Math.min(Number(m.answered_count)||0,Math.max(0,groupTotal-1));$('studyRoomLobby').classList.add('hidden');$('groupResults').classList.add('hidden');$('groupQuizShell').classList.remove('hidden');$('groupQuizRoomCode').textContent=roomData.room_code;$('groupQuizTitle').textContent=roomData.selected_course||'Study Group';startGroupClock();try{await loadGroupQ(groupNo)}finally{if(roomData&&!roomPoll)roomPoll=setInterval(()=>{void syncRoom()},2500)}}
 function startGroupClock(){if(roomClock)clearInterval(roomClock);const tick=async()=>{if(!groupEndsAt){$('groupQuizTimer').textContent='--:--';return}const left=Math.max(0,Math.floor((groupEndsAt.getTime()-Date.now())/1000));$('groupQuizTimer').textContent=fmt(left);if(left<=0&&!roomAutoSubmitting){clearInterval(roomClock);roomAutoSubmitting=true;await autoExpireGroupRoom();roomAutoSubmitting=false}};tick();roomClock=setInterval(tick,1000)}
 async function autoExpireGroupRoom(){if(!roomData)return;try{if(groupFormat==='theory'&&$('groupTheoryAnswer')&&!$('groupTheoryAnswer').classList.contains('hidden')){const a=$('groupTheoryAnswer').value.trim();if(a.length>=5){try{await supabaseClient.functions.invoke('study-theory-grade',{body:{room_id:roomData.id,question_no:groupNo,answer_text:a}})}catch{}}}const r=await supabaseClient.rpc('expire_study_room_if_needed',{p_room_id:roomData.id});if(r.error)throw r.error;$('groupQuizShell').classList.add('hidden');$('groupFinishWaiting')?.classList.add('hidden');await groupResults();alert('Time is up. The room was submitted automatically and the answers are now available for review.')}catch(e){alert(e.message||'Time expired. Refreshing room results…');await syncRoom()}}
