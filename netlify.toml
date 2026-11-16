@@ -2,6 +2,7 @@
 # Keep the privacy-policy repository root and GitHub Pages paths unchanged.
 [build]
   publish = "nexus-preview"
+  command = "npm install --prefix nexus-preview --no-audit --no-fund && npm --prefix nexus-preview run optimize-images"
 
 [build.environment]
   NODE_VERSION = "22"
