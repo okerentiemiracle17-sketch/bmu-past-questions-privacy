@@ -46,7 +46,7 @@ function updateUser(){const n=displayName(),first=n.trim().split(/\s+/)[0]||'Stu
 function updateAccess(){premium=isPremium(profile);const ex=expiry(profile?.subscription_expires_at);$('subscriptionBadge').textContent=premium?'Premium Active':'Free Access';$('subscriptionMeta').textContent=premium?(ex?`Until ${ex}`:'Full Access'):'5 MCQs per course';$('pqAccessLabel').textContent=premium?'Premium Active':'Free Access';$('pqAccessDetail').textContent=premium?'Up to 70 questions':'5 demo questions per course';$('accessCardTitle').textContent=premium?'Premium Access':'Free Access';$('accessCardText').textContent=premium?'Stored questions first, then approved-material Nexus AI, then validated general AI fallback.':'Free users can practise up to 5 stored demo questions per course.';$('questionCount').disabled=!premium;$('materialsAccessLabel').textContent=premium?'Premium Library':'Library Preview';$('materialsAccessDetail').textContent=premium?'Books, notes and slides are unlocked':'Browse all resources • Premium opens locked items';renderProfile()}
 const CORE_100_LEVEL_CODES=['BIO101','BIO107','CHM101','CHM107','COS101','COS107','GST111','MTH101','MTH111','PHY101','PHY107','STA111','BIO102','BIO108','CHM102','CHM108','COS102','COS108','GST112','GST114','MTH102','PHY102','PHY108'];
 function normalCourseCode(v){return s(v).toUpperCase().replace(/\s+/g,'')}
-async function loadCourses(){const {data,error}=await supabaseClient.from('courses').select('id,code,title,course_code,course_title,level,department').eq('active',true).order('code').range(0,4999);if(error){console.error(error);return}const map=new Map();(data||[]).forEach(c=>{const code=codeOf(c);if(code&&!map.has(normalCourseCode(code)))map.set(normalCourseCode(code),c)});CORE_100_LEVEL_CODES.forEach(code=>{if(!map.has(code))map.set(code,{code,course_code:code,title:'',course_title:'',level:'100',department:'All Programmes'})});courses=[...map.values()].sort((a,b)=>{const la=Number(s(a.level).replace(/\D/g,''))||999,lb=Number(s(b.level).replace(/\D/g,''))||999;return la-lb||codeOf(a).localeCompare(codeOf(b))});renderCourseSelect(courses);renderCourseBrowser();fillPastPaperCourses();renderRecent(courses);renderMaterialCourses(courses);renderGroupCourses(courses);renderSoloFilters();renderSoloCourses()}
+async function loadCourses(){const {data,error}=await supabaseClient.from('courses').select('id,code,title,course_code,course_title,level,department').eq('active',true).order('code').range(0,4999);if(error){console.error(error);return}const map=new Map();(data||[]).forEach(c=>{const code=codeOf(c);if(code&&!map.has(normalCourseCode(code)))map.set(normalCourseCode(code),c)});CORE_100_LEVEL_CODES.forEach(code=>{if(!map.has(code))map.set(code,{code,course_code:code,title:'',course_title:'',level:'100',department:'All Programmes'})});courses=[...map.values()].sort((a,b)=>{const la=Number(s(a.level).replace(/\D/g,''))||999,lb=Number(s(b.level).replace(/\D/g,''))||999;return la-lb||codeOf(a).localeCompare(codeOf(b))});const levelFilter=$('courseLevelFilter');if(levelFilter){const current=levelFilter.value;const levels=[...new Set(courses.map(c=>s(c.level).replace(/\D/g,'')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));levelFilter.innerHTML='<option value="">All Levels</option>'+levels.map(level=>`<option value="${esc(level)}">${esc(level)} Level</option>`).join('');if(levels.includes(current))levelFilter.value=current;}renderCourseSelect(courses);renderCourseBrowser();fillPastPaperCourses();renderRecent(courses);renderMaterialCourses(courses);renderGroupCourses(courses);renderSoloFilters();renderSoloCourses()}
 function filteredPracticeCourses(){const q=s($('courseSearch')?.value).toLowerCase().trim(),lv=$('courseLevelFilter')?.value||'';return courses.filter(c=>(!lv||s(c.level).replace(/\D/g,'')===lv)&&(!q||(codeOf(c)+' '+titleOf(c)+' '+s(c.department)).toLowerCase().includes(q)))}
 let pastPaperMode=false,pastPaperIdentity=null,pastPaperList=[],pastPaperLoadingSeq=0;
 // Past Questions archive follows the app's ordered Department → Level → Semester → Course flow.
@@ -440,18 +440,8 @@ document.getElementById('themeToggle')?.addEventListener('click',()=>applyTheme(
 /* =========================================================
    V3 — NEXUS AI COURSE FALLBACK + AI STUDY ROOMS
    ========================================================= */
-$('nexusStartPracticeBtn')?.addEventListener('click',()=>{
-  const code=s($('nexusCourseCode')?.value).trim().toUpperCase();
-  const name=s($('nexusCourseName')?.value).trim();
-  const format=$('nexusPracticeFormat')?.value||'mcq';
-  if(!code){msg($('nexusPracticeMessage'),'Enter the course code first.','error');return}
-  go('past-questions');
-  if($('courseSelect')) $('courseSelect').value='';
-  if($('manualCourseCode')) $('manualCourseCode').value=code;
-  if($('manualCourseName')) $('manualCourseName').value=name;
-  if($('questionType')) $('questionType').value=format;
-  msg($('practiceSetupMessage'),`${code}${name?' — '+name:''} is ready for Nexus AI Practice. Choose your question count and timer, then start.`,'success');
-});
+/* The retired Nexus AI course shortcut was removed; Generate Questions and
+   manual course entry in Past Questions are the supported paths. */
 
 $('groupUseAi')?.addEventListener('change',function(){
   $('groupAiFields')?.classList.toggle('hidden',!this.checked);
