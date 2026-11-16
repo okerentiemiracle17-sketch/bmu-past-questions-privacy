@@ -47,7 +47,8 @@ function updateAccess(){premium=isPremium(profile);const ex=expiry(profile?.subs
 const CORE_100_LEVEL_CODES=['BIO101','BIO107','CHM101','CHM107','COS101','COS107','GST111','MTH101','MTH111','PHY101','PHY107','STA111','BIO102','BIO108','CHM102','CHM108','COS102','COS108','GST112','GST114','MTH102','PHY102','PHY108'];
 function normalCourseCode(v){return s(v).toUpperCase().replace(/\s+/g,'')}
 let departmentCurriculum=[];
-async function loadCourses(){const [{data,error},curriculumResult]=await Promise.all([supabaseClient.from('courses').select('id,code,title,course_code,course_title,level,department').eq('active',true).order('code').range(0,4999),supabaseClient.from('department_curriculum_courses').select('department,level,course_code,course_title,status').eq('status','active').range(0,4999)]);if(error){console.error(error);return}if(curriculumResult.error){console.warn('Department curriculum unavailable:',curriculumResult.error.message);departmentCurriculum=[];}else{departmentCurriculum=(curriculumResult.data||[]).filter(c=>c.department&&c.course_code).map(c=>({department:c.department,level:c.level,code:c.course_code,course_code:c.course_code,title:c.course_title,course_title:c.course_title}));}const map=new Map();(data||[]).forEach(c=>{const code=codeOf(c);if(code&&!map.has(normalCourseCode(code)))map.set(normalCourseCode(code),c)});departmentCurriculum.forEach(c=>{const code=codeOf(c),key=normalCourseCode(code);if(key&&!map.has(key))map.set(key,c)});CORE_100_LEVEL_CODES.forEach(code=>{if(!map.has(code))map.set(code,{code,course_code:code,title:'',course_title:'',level:'100',department:'All Programmes'})});courses=[...map.values()].sort((a,b)=>{const la=Number(s(a.level).replace(/\D/g,''))||999,lb=Number(s(b.level).replace(/\D/g,''))||999;return la-lb||codeOf(a).localeCompare(codeOf(b))});const levelFilter=$('courseLevelFilter');if(levelFilter){const current=levelFilter.value;const levels=[...new Set(courses.map(c=>s(c.level).replace(/\D/g,'')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));levelFilter.innerHTML='<option value="">All Levels</option>'+levels.map(level=>`<option value="${esc(level)}">${esc(level)} Level</option>`).join('');if(levels.includes(current))levelFilter.value=current;}renderCourseSelect(courses);renderCourseBrowser();fillPastPaperCourses();renderRecent(courses);renderMaterialCourses(courses);renderGroupCourses(courses);renderSoloFilters();renderSoloCourses()}
+let verifiedProgrammeCourses=[];
+async function loadCourses(){const [{data,error},curriculumResult,mappingResult]=await Promise.all([supabaseClient.from('courses').select('id,code,title,course_code,course_title,level,department').eq('active',true).order('code').range(0,4999),supabaseClient.from('department_curriculum_courses').select('department,level,course_code,course_title,status').eq('status','active').range(0,4999),supabaseClient.from('programme_courses').select('level,semester,programmes(name),courses(id,code,title,course_code,course_title)').eq('verified',true).range(0,4999)]);if(error){console.error(error);return}if(curriculumResult.error){console.warn('Department curriculum unavailable:',curriculumResult.error.message);departmentCurriculum=[];}else{departmentCurriculum=(curriculumResult.data||[]).filter(c=>c.department&&c.course_code).map(c=>({department:c.department,level:c.level,code:c.course_code,course_code:c.course_code,title:c.course_title,course_title:c.course_title}));}if(mappingResult.error){console.warn('Programme course assignments unavailable',mappingResult.error);verifiedProgrammeCourses=[]}else{verifiedProgrammeCourses=(mappingResult.data||[]).filter(m=>m.programmes?.name&&m.courses&&(m.courses.code||m.courses.course_code)).map(m=>({...m.courses,department:m.programmes.name,level:m.level,semester:m.semester,verifiedAssignment:true}));}const map=new Map();(data||[]).forEach(c=>{const code=codeOf(c);if(code&&!map.has(normalCourseCode(code)))map.set(normalCourseCode(code),c)});departmentCurriculum.forEach(c=>{const code=codeOf(c),key=normalCourseCode(code);if(key&&!map.has(key))map.set(key,c)});CORE_100_LEVEL_CODES.forEach(code=>{if(!map.has(code))map.set(code,{code,course_code:code,title:'',course_title:'',level:'100',department:'All Programmes'})});courses=[...map.values()].sort((a,b)=>{const la=Number(s(a.level).replace(/\D/g,''))||999,lb=Number(s(b.level).replace(/\D/g,''))||999;return la-lb||codeOf(a).localeCompare(codeOf(b))});const levelFilter=$('courseLevelFilter');if(levelFilter){const current=levelFilter.value;const levels=[...new Set(courses.map(c=>s(c.level).replace(/\D/g,'')).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));levelFilter.innerHTML='<option value="">All Levels</option>'+levels.map(level=>`<option value="${esc(level)}">${esc(level)} Level</option>`).join('');if(levels.includes(current))levelFilter.value=current;}renderCourseSelect(courses);renderCourseBrowser();fillPastPaperCourses();renderRecent(courses);renderMaterialCourses(courses);renderGroupCourses(courses);renderSoloFilters();renderSoloCourses()}
 function filteredPracticeCourses(){const q=s($('courseSearch')?.value).toLowerCase().trim(),lv=$('courseLevelFilter')?.value||'';return courses.filter(c=>(!lv||s(c.level).replace(/\D/g,'')===lv)&&(!q||(codeOf(c)+' '+titleOf(c)+' '+s(c.department)).toLowerCase().includes(q)))}
 let pastPaperMode=false,pastPaperIdentity=null,pastPaperList=[],pastPaperLoadingSeq=0;
 // Past Questions archive follows the app's ordered Department → Level → Semester → Course flow.
@@ -55,24 +56,24 @@ let pastPaperMode=false,pastPaperIdentity=null,pastPaperList=[],pastPaperLoading
 // university courses are also available under each department.
 function pastPaperDept(c){return s(c.department).trim()||'All Programmes'}
 function pastPaperLevel(c){const match=s(c.level).match(/\d{3}|JUPEB/i);return match?match[0].toUpperCase():s(c.level).trim()}
+function canonicalPastPaperDept(value){const name=s(value).trim();return name.toLowerCase()==='medicine and surgery'?'Medicine & Surgery':name}
 function pastPaperScopedCourses(){
- const dept=$('pastPaperDepartment')?.value||'',lv=$('pastPaperLevel')?.value||'';
- // Merge departmental curriculum AND the general course catalogue.
- // Some valid courses (for example ANA 244 at 200 Level) exist only in courses.
- // Prefer the department-specific record when the same course appears twice.
- const combined=[...departmentCurriculum,...courses];
- const match=combined.filter(c=>{
-  const level=pastPaperLevel(c);
-  const sharedFirstYear=level==='100';
-  const departmentMatches=!dept||sharedFirstYear||pastPaperDept(c)===dept||pastPaperDept(c).toLowerCase()==='all programmes';
-  return departmentMatches&&(!lv||level===lv);
- });
+ const dept=canonicalPastPaperDept($('pastPaperDepartment')?.value||'');
+ const lv=$('pastPaperLevel')?.value||'',sem=$('pastPaperSemester')?.value||'';
+ const assignments=verifiedProgrammeCourses.filter(c=>!dept||canonicalPastPaperDept(pastPaperDept(c))===dept);
+ const mappedFirstYear=assignments.some(c=>pastPaperLevel(c)==='100');
  const unique=new Map();
- for(const c of match){
-  const key=normalCourseCode(codeOf(c));
-  if(!key)continue;
-  const previous=unique.get(key);
-  if(!previous||(dept&&pastPaperDept(c)===dept&&pastPaperDept(previous)!==dept))unique.set(key,c);
+ for(const c of [...assignments,...departmentCurriculum,...courses]){
+  const level=pastPaperLevel(c),cDept=canonicalPastPaperDept(pastPaperDept(c));
+  if(lv&&level!==lv)continue;
+  if(dept&&level!=='100'&&cDept!==dept&&cDept.toLowerCase()!=='all programmes')continue;
+  // First-year assignments are shared, but their confirmed semester matters.
+  if(level==='100'&&mappedFirstYear&&!c.verifiedAssignment)continue;
+  if(sem&&c.verifiedAssignment&&String(c.semester)!==sem)continue;
+  const key=normalCourseCode(codeOf(c));if(!key)continue;
+  const prev=unique.get(key);
+  if(!prev||(!prev.verifiedAssignment&&c.verifiedAssignment)||
+   (!prev.verifiedAssignment&&cDept===dept&&canonicalPastPaperDept(pastPaperDept(prev))!==dept))unique.set(key,c);
  }
  return [...unique.values()].sort((a,b)=>codeOf(a).localeCompare(codeOf(b)));
 }
@@ -88,7 +89,7 @@ function fillPastPaperCourses(){
  if(!dept||!lv||!sem||!course)return;
  const prev=dept.value;
  const signupDepartments=[...document.querySelectorAll('#signupProgramme option')].map(option=>option.value.trim()).filter(Boolean);
- const depts=[...new Set([...signupDepartments,...(departmentCurriculum.length?departmentCurriculum:courses).map(pastPaperDept)])].filter(x=>x.toLowerCase()!=='all programmes').sort((a,b)=>a.localeCompare(b));
+ const depts=[...new Set([...signupDepartments,...departmentCurriculum.map(pastPaperDept),...verifiedProgrammeCourses.map(pastPaperDept),...courses.map(pastPaperDept)].map(canonicalPastPaperDept))].filter(x=>x.toLowerCase()!=='all programmes').sort((a,b)=>a.localeCompare(b));
  dept.innerHTML='<option value="">Choose department</option>'+depts.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
  if(depts.includes(prev))dept.value=prev;
  refreshPastPaperLevels();
