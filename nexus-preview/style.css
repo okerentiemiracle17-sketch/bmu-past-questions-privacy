@@ -1230,3 +1230,14 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 .quiz-spectator-reaction small{color:var(--soft);font-size:11px}
 @media(max-width:600px){#dashboard #spectateLivePanel{padding:14px}.spectate-screen-header{align-items:flex-start}.spectate-question-card{padding:13px}.spectate-choice{padding:10px;gap:8px}.spectate-selected-label{font-size:10px}.spectate-question-card h3{font-size:15px}}
 @media(prefers-reduced-motion:reduce){.spectate-emoji{transition:none}}
+
+
+/* Live Watch Mode: small, readable spectator guidance */
+#dashboard .spectate-screen-tip{
+ margin-top:14px;padding:11px 13px;border:1px solid var(--border);
+ background:var(--surface);border-radius:11px;
+ color:var(--soft)!important;font-size:12px;line-height:1.55;
+}
+#dashboard .spectate-screen-header strong{letter-spacing:-.015em}
+#dashboard .spectate-screen-footer{margin-top:12px}
+#dashboard .spectate-emoji-bar{margin-top:12px}
