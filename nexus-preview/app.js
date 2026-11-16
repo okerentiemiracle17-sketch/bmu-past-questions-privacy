@@ -26,7 +26,7 @@ function closeMobile(){$('desktopNav')?.classList.remove('mobile-open');$('mobil
 $('mobileNavToggle')?.addEventListener('click',()=>{const o=$('desktopNav')?.classList.toggle('mobile-open');$('mobileNavToggle')?.setAttribute('aria-expanded',o?'true':'false')});document.querySelectorAll('.desktop-nav a').forEach(a=>a.addEventListener('click',closeMobile));
 function publicView(){stopTimer();stopRoom();$('dashboard')?.classList.add('hidden');$('publicWebsite')?.classList.remove('hidden');document.querySelector('.topbar')?.classList.remove('hidden');document.querySelector('footer')?.classList.remove('hidden')}
 async function dashboardView(u){user=u;document.querySelector('.topbar')?.classList.add('hidden');$('publicWebsite')?.classList.add('hidden');document.querySelector('footer')?.classList.add('hidden');$('dashboard')?.classList.remove('hidden');await loadProfile();updateUser();updateAccess();await loadCourses();await dashboardStats();loadNotices();go('home');animateDash()}
-function go(page){Object.entries(pageMap).forEach(([k,el])=>el?.classList.toggle('hidden',k!==page));document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));window.scrollTo({top:0,behavior:'smooth'});const active=pageMap[page];if(active){active.classList.remove('page-enter');void active.offsetWidth;active.classList.add('page-enter')}if(page==='solo-learning')loadSoloLearning();if(page==='materials')loadMaterials();if(page==='videos')loadVideos();if(page==='results')loadResults();if(page==='profile'){renderProfile();setProfileEditMode(false)}}
+function go(page){Object.entries(pageMap).forEach(([k,el])=>el?.classList.toggle('hidden',k!==page));document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const dashboardContent=$('dashboard')?.querySelector('.dashboard-content');if(dashboardContent&&getComputedStyle(dashboardContent).overflowY==='auto'){dashboardContent.scrollTo({top:0,behavior:'instant'})}else{window.scrollTo({top:0,behavior:'smooth'})}const active=pageMap[page];if(active){active.classList.remove('page-enter');void active.offsetWidth;active.classList.add('page-enter')}if(page==='solo-learning')loadSoloLearning();if(page==='materials')loadMaterials();if(page==='videos')loadVideos();if(page==='results')loadResults();if(page==='profile'){renderProfile();setProfileEditMode(false)}}
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
 $('startBtn')?.addEventListener('click',()=>$('login')?.scrollIntoView({behavior:'smooth'}));['signupBtn','heroCreateBtn','nexusSignupBtn','createAccountBtn'].forEach(id=>$(id)?.addEventListener('click',()=>openModal('signupModal')));$('closeSignup')?.addEventListener('click',()=>closeModal('signupModal'));$('forgotPasswordBtn')?.addEventListener('click',()=>{if($('forgotEmail'))$('forgotEmail').value=$('email')?.value||user?.email||'';openModal('forgotPasswordModal')});$('closeForgotPassword')?.addEventListener('click',()=>closeModal('forgotPasswordModal'));
 function showVerifyEmail(email=''){const field=$('verifyEmailAddress');if(field)field.value=email||$('signupEmail')?.value.trim()||$('email')?.value.trim()||'';msg($('verifyEmailMessage'),'Please check your inbox. You can also resend the confirmation email.');closeModal('signupModal');openModal('verifyEmailModal')}
@@ -56,7 +56,7 @@ function pastPaperDept(c){return s(c.department).trim()||'All Programmes'}
 function pastPaperLevel(c){const match=s(c.level).match(/\d{3}|JUPEB/i);return match?match[0].toUpperCase():s(c.level).trim()}
 function pastPaperScopedCourses(){
  const dept=$('pastPaperDepartment')?.value||'',lv=$('pastPaperLevel')?.value||'';
- return courses.filter(c=> (!dept||pastPaperDept(c)===dept||pastPaperDept(c).toLowerCase()==='all programmes') && (!lv||pastPaperLevel(c)===lv));
+ return courses.filter(c=>{const level=pastPaperLevel(c);const sharedFirstYear=level==='100';const departmentMatches=!dept||sharedFirstYear||pastPaperDept(c)===dept||pastPaperDept(c).toLowerCase()==='all programmes';return departmentMatches&&(!lv||level===lv)});
 }
 function resetPastPaperYears(){
  pastPaperLoadingSeq++;pastPaperList=[];
@@ -89,7 +89,7 @@ function refreshPastPaperLevels(){
  if(!lv.value){sem.value='';sem.disabled=true}
  else sem.disabled=false;
  refreshPastPaperCourseOptions();
- if(dept&&!courses.some(c=>pastPaperDept(c)===dept))msg($('pastPaperMessage'),`No department-specific courses are currently catalogued for ${dept}. Shared university courses may still appear. You can use Random Practice for other courses.`, 'info');
+ if(dept&&!courses.some(c=>pastPaperDept(c)===dept))msg($('pastPaperMessage'),`All catalogued 100-level courses are shown for ${dept}. Department-specific higher-level courses will appear when verified and added.`, 'info');
 }
 function refreshPastPaperCourseOptions(){
  const dept=$('pastPaperDepartment')?.value||'',lv=$('pastPaperLevel')?.value||'',sem=$('pastPaperSemester')?.value||'',el=$('pastPaperCourse');
