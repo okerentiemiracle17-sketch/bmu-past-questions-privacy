@@ -144,9 +144,10 @@ function refreshPastPaperCourseOptions(){
  // The academic-session lookup is semester-aware; we do not guess semester
  // membership from course-code parity, because schools can vary.
  const available=pastPaperScopedCourses();
- available.forEach(c=>{const option=new Option(`${codeOf(c)} — ${titleOf(c)||'Course'}`,codeOf(c));el.add(option)});
+ available.forEach(c=>{const assigned=c.verifiedAssignment&&String(c.semester)===sem;const suffix=assigned?'':' (semester placement not confirmed)';const option=new Option(`${codeOf(c)} — ${titleOf(c)||'Course'}${suffix}`,codeOf(c));el.add(option)});
  if(available.some(c=>codeOf(c)===prior))el.value=prior;
- if(!available.length)msg($('pastPaperMessage'),'No verified courses are catalogued for this department, level and semester. Use Nexus AI Practice below with your course code, or upload course notes. AI practice is not an official past paper.','info');
+ if(!available.length)msg($('pastPaperMessage'),'No courses are catalogued for this department, level and semester. You can generate Nexus AI practice from a course code or upload source materials.','info');
+ else if(available.some(c=>!c.verifiedAssignment))msg($('pastPaperMessage'),'Some listed courses have an unconfirmed semester assignment. Only examination years returned from the year-based archive are eligible for Past Questions.','info');
  if(el.value)refreshPastPaperYears();
 }
 $('pastPaperDepartment')?.addEventListener('change',()=>{if($('pastPaperLevel'))$('pastPaperLevel').value='';refreshPastPaperLevels()});
