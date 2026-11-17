@@ -906,7 +906,7 @@ $('nexusCheckVideo')?.addEventListener('click',async()=>{
 $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode='text'; // No visible mode selection: route from the student's message.
  if(mode==='text'){
   if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q)&&nvChoose(q))mode='diagram';
-  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make|animate|show)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q)&&nvChoose(q))mode='animation';
+  else if((/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make|animate|show)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q)||/^(?:please\s+|can you\s+|could you\s+)?animate\s+/i.test(q))&&nvChoose(q))mode='animation';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode=nvChartValues(q).length>=2?'free-table':'table';else if(/\b(?:bar chart|pie chart|bar graph|pie graph)\b/i.test(q)&&nvChartValues(q).length>=2)mode='diagram';
  }
  if(mode==='diagram'||mode==='animation'||mode==='free-table'){
