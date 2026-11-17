@@ -245,7 +245,7 @@ async function nexusStartMissingCourseDirect(code,name=''){
  if($('questionType'))$('questionType').value='mcq';
  if($('sessionMinutes'))$('sessionMinutes').value=$('pastPaperMinutes')?.value||'30';
  $('practiceSetup')?.classList.remove('hidden');
- msg($('pastPaperMessage'),'Starting '+courseCode+' practice. Nexus AI will generate questions automatically if the course has no stored questions.','info');
+ msg($('pastPaperMessage'),'Loading stored '+courseCode+' questions. Nexus AI will only be used if the question bank is empty.','info');
  await startQuiz();
 }
 async function startYearPastPaper(){
@@ -326,12 +326,12 @@ async function startQuiz(){
   const courseTitle=selectedCode?(selected?.dataset?.title||''):manualName;
   if(!courseCode){msg($('practiceSetupMessage'),'Select a listed course or enter a course code.','error');return}
   const format=$('questionType')?.value||'mcq';
-  premium=isPremium(profile);const remaining=premium?70:await nexusFreeRemaining();if(!premium&&remaining<1){msg($('practiceSetupMessage'),'You have used your 5 free questions for today. Upgrade to Premium for more.','error');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,remaining);
+  premium=isPremium(profile);let remaining=70;try{remaining=premium?70:await nexusFreeRemaining()}catch(e){msg($('practiceSetupMessage'),e.message||'Cannot check free question balance.','error');msg($('pastPaperMessage'),e.message||'Cannot check free question balance.','error');return}if(!premium&&remaining<1){const notice='Your 5 free questions for today have been used. They reset at midnight WAT. Upgrade to Premium for more.';msg($('practiceSetupMessage'),notice,'error');msg($('pastPaperMessage'),notice,'info');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,remaining);
   if(format==='theory'){await startTheoryPractice(courseCode,courseTitle,wanted);return}
   questions=[];answers={};reviews={};aiReviews={};qIndex=0;submitted=false;reviewMode=false;
   $('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Checking stored questions...');
   try{
-    if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='mcq'){questions=convertGenerated(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!questions.length)throw new Error('The uploaded material did not produce usable MCQs.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Uploaded Material';renderQ();startClock();return}
+    if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='mcq'){questions=convertGenerated(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!questions.length)throw new Error('The uploaded material did not produce usable MCQs.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Uploaded Material';renderQ();startClock();$('yearPastPapers')?.classList.add('hidden');$('quizShell')?.scrollIntoView({behavior:'smooth',block:'start'});return}
     let st=premium?await supabaseClient.rpc('get_secure_quiz_questions_v3',{p_course_code:courseCode,p_limit:wanted}):await supabaseClient.rpc('get_demo_questions',{p_course_code:courseCode});
     if(st.error)throw new Error(st.error.message||'Unable to load stored questions.');if(Array.isArray(st.data))questions.push(...st.data.slice(0,wanted));
     let generatedViaNexus=false;
@@ -349,8 +349,8 @@ async function startQuiz(){
     if(missing>0&&premium){msg($('practiceSetupMessage'),'Nexus AI is preparing additional questions...');try{questions.push(...await generalAi(courseCode,courseTitle,missing))}catch(err){if(!questions.length)throw err;console.warn('Additional AI questions unavailable; using published course questions.',err);msg($('practiceSetupMessage'),'Starting with available published questions.','info')}}
     const seen=new Set();questions=questions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);
     if(!questions.length)throw new Error('Neither stored questions nor AI practice questions were available for this course. Please try again shortly.');if(!premium&&!generatedViaNexus)void nexusRefreshDailyLimit();
-    seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard')?.classList.add('hidden');$('theoryShell')?.classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Practice Session';renderQ();startClock()
-  }catch(e2){msg($('practiceSetupMessage'),e2.message||'Unable to prepare questions.','error')}finally{$('loadQuestionsBtn').disabled=false}
+    seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard')?.classList.add('hidden');$('theoryShell')?.classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Practice Session';renderQ();startClock();$('yearPastPapers')?.classList.add('hidden');$('quizShell')?.scrollIntoView({behavior:'smooth',block:'start'});msg($('pastPaperMessage'),'','info')
+  }catch(e2){const message=e2.message||'Unable to prepare questions.';msg($('practiceSetupMessage'),message,'error');msg($('pastPaperMessage'),message,'error');console.warn('Unable to start course practice:',e2)}finally{$('loadQuestionsBtn').disabled=false}
 }
 function convertGenerated(rows,source){const letters=['A','B','C','D'];return rows.map((x,i)=>{if(!x?.question||!Array.isArray(x.options)||x.options.length<4)return null;const ci=Number(x.correct_index);if(!Number.isInteger(ci)||ci<0||ci>3)return null;const id=`${source}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,7)}`;aiReviews[id]={correct_option:letters[ci],answer_text:x.answer||x.options[ci],explanation:x.explanation||'Validated by Nexus AI.',is_ai:true};return{id,question_text:x.question,option_a:x.options[0],option_b:x.options[1],option_c:x.options[2],option_d:x.options[3],nexus_ai:true,source_mode:source}}).filter(Boolean)}
 
