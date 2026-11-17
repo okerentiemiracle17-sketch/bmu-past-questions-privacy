@@ -723,6 +723,7 @@ function nvParseDiagramRequest(prompt){
   const kind=nvChoose(input);
   if(kind&&kind!=='bar'&&kind!=='pie')topics.push({kind,topic:input});
  }
+ if(topics.length===1&&(topics[0].kind==='bar'||topics[0].kind==='pie'))topics[0].topic=input;
  if(!topics.length)throw Error('Supported free labelled images: human heart, nephron, neuron, animal or plant cell, mitosis, circuit, water cycle, flowchart and charts.');
  if(requested&&requested>10)throw Error('You can request a maximum of 10 labelled diagrams at once.');
  if(requested&&topics.length<requested)throw Error('For '+requested+' distinct images, please name '+requested+' supported topics (e.g. heart, kidney, neuron), or request 4 stages of mitosis.');
