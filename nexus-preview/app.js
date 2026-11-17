@@ -495,7 +495,13 @@ function openMissingCourseNexus(mode,fromSolo=false){
   $('nexusGeneratePrompt')?.focus();
  }
 }
-$('pastPaperAiFallback')?.addEventListener('click',()=>openMissingCourseNexus('generate'));
+$('pastPaperAiFallback')?.addEventListener('click',async()=>{
+ const code=s($('pastPaperMissingCourseCode')?.value||$('pastPaperCourse')?.value).trim().toUpperCase();
+ const name=s($('pastPaperMissingCourseName')?.value||$('pastPaperCourse')?.selectedOptions?.[0]?.textContent?.split(' — ').slice(1).join(' — ')||'').trim();
+ if(!code){msg($('pastPaperMessage'),'Enter a course code to start practice.','error');$('pastPaperMissingCourseCode')?.focus();return}
+ const button=$('pastPaperAiFallback');button.disabled=true;
+ try{await nexusStartMissingCourseDirect(code,name)}finally{button.disabled=false}
+});
 $('pastPaperUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload'));
 $('soloUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload',true));
 function updateNexusGenerationAccess(){
