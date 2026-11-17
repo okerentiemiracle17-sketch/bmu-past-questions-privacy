@@ -947,6 +947,57 @@ async function nvRecordWebm(prompt,btn){
  }finally{recorder.stop();stream.getTracks().forEach(t=>t.stop());btn.disabled=false;btn.textContent=old}
  const blob=await done;nvDownload(blob,'nexus-study-animation.webm');
 }
+
+function nvGeneratedSvg(scene){
+ if(!scene||!Array.isArray(scene.elements)||scene.elements.length<3)throw Error('AI could not prepare a usable illustration. Try describing the subject more specifically.');
+ const escVal=v=>nvEscape(String(v??''));
+ const color=v=>/^#[0-9a-fA-F]{6}$/.test(String(v||''))?v:'#182843';
+ const n=(v,max=800)=>Math.min(max,Math.max(0,Number(v)||0));
+ const shape=scene.elements.slice(0,80).map(e=>{
+  if(!e)return '';
+  const fill=color(e.fill),stroke=color(e.stroke),sw=n(e.sw,12);
+  if(e.type==='ellipse')return '<ellipse cx="'+n(e.cx)+'" cy="'+n(e.cy,480)+'" rx="'+n(e.rx,350)+'" ry="'+n(e.ry,220)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+  if(e.type==='circle')return '<circle cx="'+n(e.cx)+'" cy="'+n(e.cy,480)+'" r="'+n(e.r,220)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+  if(e.type==='rect')return '<rect x="'+n(e.x)+'" y="'+n(e.y,480)+'" width="'+n(e.w)+'" height="'+n(e.h,480)+'" rx="6" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+  if(e.type==='line')return '<line x1="'+n(e.x1)+'" y1="'+n(e.y1,480)+'" x2="'+n(e.x2)+'" y2="'+n(e.y2,480)+'" stroke="'+stroke+'" stroke-width="'+Math.max(sw,1)+'"/>';
+  if(e.type==='polygon'&&Array.isArray(e.points))return '<polygon points="'+e.points.slice(0,40).map(pt=>Array.isArray(pt)?n(pt[0])+','+n(pt[1],480):'').join(' ')+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+  if(e.type==='text')return '<text x="'+n(e.x)+'" y="'+n(e.y,480)+'" text-anchor="middle" fill="'+fill+'" font-family="Arial, sans-serif" font-size="'+Math.max(11,n(e.size,30))+'">'+escVal(String(e.text||'').slice(0,45))+'</text>';
+  return '';
+ }).join('');
+ const heading=nvEscape(String(scene.title||'Custom study illustration').slice(0,100));
+ return '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480"><rect width="800" height="480" fill="#ffffff"/><text x="400" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="23" font-weight="700" fill="#182843">'+heading+'</text>'+shape+'</svg>';
+}
+function nvShowGenerated(scene,prompt){
+ const markup=nvGeneratedSvg(scene);
+ const item=document.createElement('div');item.className='ai-message nexus-visual-message';
+ const title=document.createElement('strong');title.textContent='Nexus AI • Custom Labelled Illustration';item.appendChild(title);
+ const desc=document.createElement('p');desc.textContent=String(scene.description||'AI-designed vector illustration of your subject.');item.appendChild(desc);
+ const figure=document.createElement('figure');figure.className='nexus-media';figure.innerHTML=markup;item.appendChild(figure);
+ const actions=document.createElement('div');actions.className='nexus-visual-actions';
+ const png=document.createElement('button');png.type='button';png.className='secondary-btn';png.textContent='Download PNG';
+ png.onclick=async()=>{try{nvDownload(await nvSvgToPng(markup),'nexus-custom-illustration.png')}catch(e){msg($('nexusStatus'),e.message||'Unable to download PNG.','error')}};actions.appendChild(png);
+ const svg=document.createElement('button');svg.type='button';svg.className='secondary-btn';svg.textContent='Download SVG';
+ svg.onclick=()=>nvDownload(new Blob([markup],{type:'image/svg+xml'}),'nexus-custom-illustration.svg');actions.appendChild(svg);
+ item.appendChild(actions);
+ const note=document.createElement('small');note.textContent='AI-assisted vector illustration. Labels and anatomy may be inaccurate; verify against course materials.';item.appendChild(note);
+ $('nexusConversation').appendChild(item);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+}
+async function nvGenerateAnyDiagram(prompt){
+ const balance=await supabaseClient.rpc('nexus_visual_remaining');
+ if(balance.error)throw new Error('Could not verify your daily image allowance.');
+ const remaining=Number((Array.isArray(balance.data)?balance.data[0]:balance.data)?.remaining)||0;
+ if(remaining<1)throw new Error('Your daily image limit has been reached. Please try again after midnight Nigerian time.');
+ const {data,error}=await supabaseClient.functions.invoke('ai-tutor',{body:{action:'draw_svg',question:prompt}});
+ if(error){
+  let details={};try{if(error.context?.json)details=await error.context.json()}catch(_){}
+  throw new Error(details.message||details.error||'The illustration service could not prepare this drawing. Please try again.');
+ }
+ if(!data?.elements?.length)throw new Error('No visual elements were returned. Try describing the drawing more clearly.');
+ const scene=data;nvGeneratedSvg(scene);
+ const usage=await nvReserveDiagramBatch([String(prompt).slice(0,160)]);
+ nvShowGenerated(scene,prompt);
+ return usage;
+}
 function nvShowVisual(prompt,animate=false){
  const info=nvDiagram(prompt,animate?0:null),item=document.createElement('div');item.className='ai-message nexus-visual-message';
  const heading=document.createElement('strong');heading.textContent='Nexus Visual Studio • '+(animate?'Free Animated Diagram':'Free Diagram');item.appendChild(heading);
@@ -1023,12 +1074,20 @@ $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const 
    if(mode==='free-table'){nvFreeTable(q);msg($('nexusStatus'),'Free data table ready. Download CSV.','success')}
    else if(mode==='animation'){nvShowVisual(q,true);msg($('nexusStatus'),'Free animation ready. Download WebM where supported.','success')}
    else{
-    const batch=nvParseDiagramRequest(q);
-    // Render and validate every diagram before reserving the daily allowance.
-    for(const topic of batch.topics)nvDiagram(topic);
-    const usage=await nvReserveDiagramBatch(batch.topics);
-    for(const topic of batch.topics)nvShowVisual(topic,false);
-    msg($('nexusStatus'),batch.topics.length+' labelled diagram'+(batch.topics.length===1?'':'s')+' ready • '+usage.remaining+'/'+usage.limit+' daily image allowance remaining.','success');
+    let batch=null;
+    try{batch=nvParseDiagramRequest(q)}catch(parseError){
+      if(/maximum of 10|distinct images/i.test(String(parseError.message||'')))throw parseError;
+    }
+    if(batch){
+      for(const topic of batch.topics)nvDiagram(topic);
+      const usage=await nvReserveDiagramBatch(batch.topics);
+      for(const topic of batch.topics)nvShowVisual(topic,false);
+      msg($('nexusStatus'),batch.topics.length+' labelled diagram'+(batch.topics.length===1?'':'s')+' ready • '+usage.remaining+'/'+usage.limit+' daily image allowance remaining.','success');
+    }else{
+      msg($('nexusStatus'),'Nexus AI is drawing a custom vector illustration…','info');
+      const usage=await nvGenerateAnyDiagram(q);
+      msg($('nexusStatus'),'Custom labelled drawing ready • '+usage.remaining+'/'+usage.limit+' daily image allowance remaining.','success');
+    }
    }
   }catch(err){addChat('Nexus AI',err.message||'This free visual is not available.','ai-message');msg($('nexusStatus'),err.message||'Visual unavailable.','error')}
   finally{$('nexusAskBtn').disabled=false}
