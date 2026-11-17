@@ -1465,3 +1465,22 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 .solo-session-host{width:100%;min-width:0;margin-top:12px}
 .solo-session-host.hidden{display:none!important}
 .solo-session-host .quiz-shell,.solo-session-host .result-card{max-width:1100px;margin:0 auto 24px}
+
+
+/* Nexus AI multimodal creation tools */
+.nexus-capability-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 16px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--surface2)}
+.nexus-capability-bar label{font-weight:700;font-size:12px;letter-spacing:.02em}
+.nexus-capability-bar select{max-width:240px;min-width:150px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text)}
+.nexus-media-note{font-size:12px;line-height:1.5;color:var(--soft);flex:1}
+.nexus-video-job-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;margin:8px 16px;background:rgba(214,72,88,.07);border:1px solid rgba(214,72,88,.25);border-radius:14px}
+.nexus-video-job-bar.hidden{display:none!important}
+.nexus-visual-message{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere}
+.nexus-visual-message figure{margin:12px 0 0}
+.nexus-visual-message img,.nexus-visual-message video{display:block;width:100%;max-width:700px;max-height:600px;object-fit:contain;border:1px solid var(--border);border-radius:14px;background:#101116}
+.nexus-visual-message figcaption{font-size:13px;color:var(--soft);line-height:1.5;margin:10px 0}
+.nexus-image-download{display:inline-flex!important;align-items:center;justify-content:center;min-height:40px;margin-top:6px;text-decoration:none}
+.nexus-message-content .nexus-table-wrap{overflow-x:auto;max-width:100%;margin:12px 0;border:1px solid var(--border);border-radius:12px}
+.nexus-message-content table{border-collapse:collapse;width:100%;font-size:13px;min-width:360px}
+.nexus-message-content th,.nexus-message-content td{padding:12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.nexus-message-content th{background:rgba(214,72,88,.10);font-weight:750}
+@media(max-width:650px){.nexus-capability-bar{margin:10px 0}.nexus-capability-bar select{width:100%;max-width:none}.nexus-visual-message img,.nexus-visual-message video{max-height:440px}}
