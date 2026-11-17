@@ -886,11 +886,6 @@ async function nexusMediaRequest(body){
  if(data?.error)throw new Error(data.error);
  return data;
 }
-$('nexusOutputMode')?.addEventListener('change',()=>{
- const mode=$('nexusOutputMode')?.value||'text',hint=$('nexusMediaNote');
- if(hint)hint.textContent=mode==='free-table'?'100% free: turn your category:value numbers into a downloadable table.':mode==='diagram'?'100% free: labelled schematic diagrams and charts; download PNG or SVG.':mode==='animation'?'100% free: short animated schematics; export WebM where supported.':mode==='image'?'Up to 4 AI images daily for each account, once the image API is funded. Free diagrams need no credits.':mode==='video'?'AI-generated videos require a paid provider. Use Free Animation instead.':mode==='table'?'Ask Nexus for readable tables. Text AI chat quota applies.':'Text chat: 10 requests daily for free users.';
- if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='free-table'?'Enter pairs like BIO: 15, CHM: 20, PHY: 10…':mode==='diagram'?'Try: Draw a labelled heart, nephron, plant cell, circuit or chart BIO: 12, CHM: 8…':mode==='animation'?'Try: Animate blood circulation, the water cycle or a circuit…':mode==='image'?'Describe an AI-generated picture (paid API required)…':mode==='video'?'Describe a generated AI video (paid API required)…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
-});
 $('nexusCheckVideo')?.addEventListener('click',async()=>{
  if(!nexusVideoJobId)return;
  const btn=$('nexusCheckVideo');btn.disabled=true;
@@ -908,10 +903,10 @@ $('nexusCheckVideo')?.addEventListener('click',async()=>{
  finally{btn.disabled=false}
 });
 
-$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode=$('nexusOutputMode')?.value||'text';
+$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode='text'; // No visible mode selection: route from the student's message.
  if(mode==='text'){
-  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q))mode='diagram';
-  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q))mode='animation';
+  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q)&&nvChoose(q))mode='diagram';
+  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make|animate|show)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q)&&nvChoose(q))mode='animation';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode=nvChartValues(q).length>=2?'free-table':'table';else if(/\b(?:bar chart|pie chart|bar graph|pie graph)\b/i.test(q)&&nvChartValues(q).length>=2)mode='diagram';
  }
  if(mode==='diagram'||mode==='animation'||mode==='free-table'){
