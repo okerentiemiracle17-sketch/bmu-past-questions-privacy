@@ -700,7 +700,7 @@ function nvChoose(prompt){
 }
 function nvChartValues(prompt){
  const data=[];const re=/([A-Za-z][A-Za-z0-9 _-]{0,25}?)\s*(?:[:=]|\s)\s*(\d+(?:\.\d+)?)(?=\s*[,;\n]|$)/g;
- for(const m of String(prompt).matchAll(re)){const label=m[1].trim().replace(/^(?:chart|plot|graph|of|with|data|values|compare)\s+/i,'');const value=Number(m[2]);if(label&&Number.isFinite(value)&&value>=0)data.push({label,value});if(data.length>=8)break}
+ for(const m of String(prompt).matchAll(re)){const label=m[1].trim().replace(/^(?:(?:make|create|generate|draw|show|plot)\s+(?:me\s+)?(?:a\s+)?(?:bar\s+|pie\s+)?(?:chart|graph|table)\s+(?:of\s+)?|(?:chart|plot|graph|of|with|data|values|compare)\s+)/i,'').trim();const value=Number(m[2]);if(label&&Number.isFinite(value)&&value>=0)data.push({label,value});if(data.length>=8)break}
  return data;
 }
 function nvFreeTable(prompt){
@@ -912,7 +912,7 @@ $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const 
  if(mode==='text'){
   if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q))mode='diagram';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q))mode='animation';
-  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode='table';
+  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode=nvChartValues(q).length>=2?'free-table':'table';else if(/\b(?:bar chart|pie chart|bar graph|pie graph)\b/i.test(q)&&nvChartValues(q).length>=2)mode='diagram';
  }
  if(mode==='diagram'||mode==='animation'||mode==='free-table'){
   addChat('You',q,'user-message');$('nexusQuestion').value='';
