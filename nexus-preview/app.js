@@ -683,6 +683,161 @@ $('openMaterialUploadBtn')?.addEventListener('click',async()=>{
 });
 $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusGeneratePrompt')?.value.trim();if(!prompt){msg($('nexusGenerateMessage'),'Describe the course or topic first.','error');return}const format=$('nexusGenerateType').value,count=Math.min(isPremium(profile)?30:5,Number($('nexusGenerateCount').value)||5);$('nexusGenerateBtn').disabled=true;msg($('nexusGenerateMessage'),`Nexus AI is generating ${count} ${format.toUpperCase()} questions…`);try{const rows=await generateTopicQuestionSet(format,prompt,count);pendingGeneratedPractice={format,topic:prompt,rows,count};const m=prompt.toUpperCase().match(/\b[A-Z]{2,4}\s*-?\s*\d{3}\b/);go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=m?m[0].replace(/\s*-\s*/,' ').trim():'AI';$('manualCourseName').value=prompt;$('questionType').value=format;$('questionCount').value=String(count);msg($('practiceSetupMessage'),`${rows.length} valid ${format.toUpperCase()} questions were prepared with answers and explanations. ${rows.length<count?'Some requested questions could not be verified, so only the usable ones are included. ':''}Choose a timer and press Start Practice.`,'success')}catch(e){msg($('nexusGenerateMessage'),e.message||'Nexus AI could not generate the questions.','error')}finally{$('nexusGenerateBtn').disabled=false}});
 
+
+/* Nexus Visual Studio Lite: browser-rendered educational schematics, no paid image/video API. */
+function nvEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function nvChoose(prompt){
+ const q=String(prompt).toLowerCase();
+ if(/\b(nephron|kidney tubule)\b/.test(q))return 'nephron';
+ if(/\b(heart|circulation|blood flow)\b/.test(q))return 'heart';
+ if(/\b(plant cell|animal cell|cell organelles|cell structure)\b/.test(q))return 'cell';
+ if(/\b(circuit|resistor|battery|electricity)\b/.test(q))return 'circuit';
+ if(/\b(water cycle|evaporation|precipitation)\b/.test(q))return 'water';
+ if(/\b(flowchart|process|workflow|algorithm|steps)\b/.test(q))return 'flowchart';
+ if(/\b(pie chart|pie graph)\b/.test(q))return 'pie';
+ if(/\b(bar chart|bar graph|histogram|graph|plot)\b/.test(q))return 'bar';
+ return '';
+}
+function nvChartValues(prompt){
+ const data=[];const re=/([A-Za-z][A-Za-z0-9 _-]{0,25}?)\s*(?:[:=]|\s)\s*(\d+(?:\.\d+)?)(?=\s*[,;\n]|$)/g;
+ for(const m of String(prompt).matchAll(re)){const label=m[1].trim().replace(/^(?:chart|plot|graph|of|with|data|values|compare)\s+/i,'');const value=Number(m[2]);if(label&&Number.isFinite(value)&&value>=0)data.push({label,value});if(data.length>=8)break}
+ return data;
+}
+function nvDiagram(prompt,progress=null){
+ const kind=nvChoose(prompt);
+ if(!kind)throw new Error('Free diagrams support: human heart, cell, nephron, simple electrical circuit, water cycle, flowchart and bar/pie charts. Try one of these topics.');
+ const line='#b8c9e4',ink='#172846',red='#c22746',blue='#2671b8',green='#29916d';
+ const txt=(x,y,label,sz=19,weight=500)=>'<text x="'+x+'" y="'+y+'" font-family="Arial, sans-serif" font-size="'+sz+'" font-weight="'+weight+'" fill="'+ink+'" text-anchor="middle">'+nvEscape(label)+'</text>';
+ const pill=(x,y,w,h,label,fill='#f0f5ff')=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="17" fill="'+fill+'" stroke="#b7c8df" stroke-width="2"/>'+txt(x+w/2,y+h/2+7,label,18,600);
+ const arrow=(x1,y1,x2,y2,color=blue)=>'<path d="M'+x1+' '+y1+' L'+x2+' '+y2+'" stroke="'+color+'" stroke-width="5" fill="none" marker-end="url(#nv-arr)"/>';
+ let body='',title='',subtitle='Simplified study schematic • not to anatomical scale',route=[];
+ if(kind==='heart'){
+  title='Four-chamber heart and blood flow';
+  body='<path d="M400 106 C330 42 245 120 262 226 C272 307 360 367 400 398 C440 367 529 307 539 226 C556 120 470 42 400 106Z" fill="#fff1f3" stroke="'+red+'" stroke-width="7"/>'
+   +'<path d="M400 110 L400 372" stroke="'+red+'" stroke-width="5" stroke-dasharray="12 8"/>'
+   +pill(288,145,96,73,'RA','#dceeff')+pill(416,145,96,73,'LA','#ffe1e5')
+   +pill(288,248,96,74,'RV','#dceeff')+pill(416,248,96,74,'LV','#ffe1e5')
+   +arrow(337,219,337,248,blue)+arrow(464,219,464,248,red)
+   +arrow(286,180,202,158,blue)+arrow(512,184,602,158,red)
+   +pill(37,121,175,70,'From body','#e3f0ff')+pill(595,121,175,70,'To body','#ffe3e8')
+   +pill(37,276,175,70,'To lungs','#e3f0ff')+pill(595,276,175,70,'From lungs','#ffe3e8')
+   +arrow(332,323,207,310,blue)+arrow(595,310,468,323,red);
+  route=[[220,180],[305,180],[335,250],[255,315],[160,315]];
+  subtitle='RA right atrium • RV right ventricle • LA left atrium • LV left ventricle';
+ }else if(kind==='cell'){
+  title='Cell structure and organelles';
+  const plant=/plant/.test(prompt.toLowerCase());
+  body=(plant?'<rect x="165" y="87" width="475" height="328" rx="32" fill="#dbf6e6" stroke="'+green+'" stroke-width="15"/>':'<ellipse cx="400" cy="251" rx="252" ry="170" fill="#dcefff" stroke="'+blue+'" stroke-width="9"/>')
+  +'<ellipse cx="395" cy="235" rx="100" ry="88" fill="#e0d5ff" stroke="#7964bb" stroke-width="5"/>'
+  +'<ellipse cx="395" cy="235" rx="43" ry="42" fill="#ae8ee5"/>'
+  +'<ellipse cx="251" cy="181" rx="51" ry="23" fill="#ffc99e" stroke="#ce8348" stroke-width="4"/>'
+  +'<ellipse cx="540" cy="309" rx="57" ry="24" fill="#ffc99e" stroke="#ce8348" stroke-width="4"/>'
+  +(plant?'<rect x="206" y="286" width="102" height="51" rx="24" fill="#8bcf8b" stroke="#358b57" stroke-width="3"/><rect x="502" y="135" width="107" height="57" rx="22" fill="#8bcf8b" stroke="#358b57" stroke-width="3"/>':'')
+  +txt(395,240,'Nucleus',17,700)+txt(252,153,'Mitochondrion',15)+txt(543,355,'Mitochondrion',15)
+  +txt(395,440,plant?'Cell wall and membrane':'Cell membrane',17,600);
+  subtitle=(plant?'Plant':'Animal')+' cell • schematic for basic identification';
+ }else if(kind==='nephron'){
+  title='Nephron: simplified filtration pathway';
+  body=pill(45,155,143,75,'Glomerulus','#ffe3e8')+pill(239,155,145,75,'PCT','#e3f0ff')+pill(433,155,143,75,'Loop','#e3f0ff')+pill(626,155,145,75,'DCT','#e3f0ff')
+   +arrow(188,194,239,194)+arrow(384,194,433,194)+arrow(576,194,626,194)
+   +'<path d="M698 231 L698 333 L420 333" stroke="'+blue+'" stroke-width="7" fill="none" marker-end="url(#nv-arr)"/>'
+   +pill(195,296,220,75,'Collecting duct','#e1f4ec')
+   +txt(408,112,'Filtration → Reabsorption → Secretion',21,600);
+  subtitle='PCT = proximal convoluted tubule • DCT = distal convoluted tubule';
+  route=[[110,193],[310,193],[504,193],[700,193],[696,332],[350,333]];
+ }else if(kind==='circuit'){
+  title='Simple battery–resistor–lamp circuit';
+  body='<path d="M200 142 H620 V335 H200 Z" fill="none" stroke="'+ink+'" stroke-width="7"/>'
+   +'<rect x="335" y="117" width="145" height="51" fill="white"/><path d="M350 142 l17 -15 17 30 17 -30 17 30 17 -30 17 15" fill="none" stroke="'+red+'" stroke-width="5"/>'
+   +'<rect x="166" y="215" width="68" height="70" fill="white"/><path d="M175 240 H224 M185 260 H214" stroke="'+blue+'" stroke-width="5"/>'
+   +'<circle cx="405" cy="335" r="42" fill="#fff3c2" stroke="#a97916" stroke-width="5"/>'
+   +'<path d="M383 314 L427 356 M427 314 L383 356" stroke="#a97916" stroke-width="4"/>'
+   +txt(408,103,'Resistor',19,600)+txt(129,260,'Battery',19)+txt(405,412,'Lamp',19);
+  subtitle='Closed circuit • current moves around the loop';
+  route=[[225,142],[620,142],[620,335],[460,335],[198,335],[198,145]];
+ }else if(kind==='water'){
+  title='The water cycle';
+  body='<path d="M0 366 Q100 320 210 368 T420 367 T800 365 V480 H0Z" fill="#aadaf3"/>'
+   +'<circle cx="130" cy="110" r="52" fill="#ffd668"/><circle cx="545" cy="127" r="43" fill="#d4e2ed"/><circle cx="590" cy="112" r="49" fill="#d4e2ed"/><circle cx="640" cy="133" r="39" fill="#d4e2ed"/>'
+   +arrow(230,365,275,176,red)+arrow(315,169,480,127,green)+arrow(608,186,639,322,blue)
+   +txt(252,271,'Evaporation',19)+txt(400,97,'Condensation',19)+txt(675,267,'Precipitation',19)+txt(395,423,'Collection',19,600);
+  subtitle='Evaporation → Condensation → Precipitation → Collection';
+  route=[[230,355],[300,170],[520,125],[650,320],[385,410]];
+ }else if(kind==='flowchart'){
+  title='Study process flowchart';
+  let steps=String(prompt).split(/\s*(?:->|→|;)\s*/).map(s=>s.replace(/\b(draw|make|create|a|flowchart|process|workflow|show|of)\b/gi,'').trim()).filter(Boolean).slice(0,4);
+  if(steps.length<2)steps=['Start','Process','Check result','Finish'];
+  steps.forEach((label,i)=>{const x=15+i*200;body+=pill(x,180,170,85,label.slice(0,18),i%2?'#fce6e9':'#dceeff');if(i<steps.length-1)body+=arrow(x+171,222,x+197,222)});
+  subtitle='Editable process steps are taken from your prompt when provided';
+  route=steps.map((_,i)=>[100+i*200,225]);
+ }else{
+  const rows=nvChartValues(prompt);if(rows.length<2)throw new Error('For a free chart, include at least two numbers, e.g. BIO 101: 15, CHM 101: 20, COS 101: 10. Nexus will draw your real values.');
+  const max=Math.max(...rows.map(x=>x.value),1),total=rows.reduce((a,x)=>a+x.value,0);
+  title=kind==='pie'?'Pie chart':'Bar chart';subtitle='Chart generated directly from the numbers you supplied';
+  if(kind==='bar'){
+   const w=Math.min(92,615/rows.length-14),space=630/rows.length;
+   rows.forEach((r,i)=>{const hh=r.value/max*260,x=105+i*space;body+='<rect x="'+x+'" y="'+(390-hh)+'" width="'+w+'" height="'+hh+'" rx="8" fill="'+(i%2?blue:red)+'"/>'+txt(x+w/2,411,r.label.slice(0,9),Math.min(16,165/rows.length),600)+txt(x+w/2,Math.max(98,383-hh),r.value,16,600)});
+   body+='<path d="M70 93 V394 H770" stroke="'+ink+'" stroke-width="3" fill="none"/>';
+  }else{
+   const colors=['#c22746','#2671b8','#29916d','#efad4a','#a17acb','#4eacc2','#e46c9b','#6b8f3c'];let a=0;rows.forEach((r,i)=>{if(!total)return;const b=a+2*Math.PI*r.value/total;const x1=310+160*Math.cos(a),y1=270+160*Math.sin(a),x2=310+160*Math.cos(b),y2=270+160*Math.sin(b),large=b-a>Math.PI?1:0;body+='<path d="M310 270 L'+x1+' '+y1+' A160 160 0 '+large+' 1 '+x2+' '+y2+'Z" fill="'+colors[i]+'"/>';a=b;body+='<rect x="525" y="'+(120+i*39)+'" width="19" height="19" rx="3" fill="'+colors[i]+'"/>'+txt(650,136+i*39,r.label.slice(0,15)+' : '+r.value,16,500)});
+  }
+ }
+ if(progress!==null&&route.length>1){
+  const position=((progress%1)+1)%1*(route.length-1),i=Math.floor(position),f=position-i,p=route[Math.min(i,route.length-1)],n=route[Math.min(i+1,route.length-1)];
+  body+='<circle cx="'+(p[0]+(n[0]-p[0])*f)+'" cy="'+(p[1]+(n[1]-p[1])*f)+'" r="13" fill="#fbbf24" stroke="'+red+'" stroke-width="4"/>';
+ }
+ return {kind,title,subtitle,svg:'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="480" viewBox="0 0 800 480"><defs><marker id="nv-arr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0 0 L0 6 L8 3Z" fill="'+blue+'"/></marker></defs><rect width="800" height="480" fill="#ffffff"/><rect x="17" y="16" width="766" height="448" rx="22" fill="#fff" stroke="#d8e1ee" stroke-width="2"/>'+txt(400,58,title,26,700)+body+txt(400,462,subtitle,14,400)+'</svg>'};
+}
+function nvDownload(blob,name){
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+function nvSvgToPng(markup){
+ return new Promise((resolve,reject)=>{
+ const img=new Image(),url=URL.createObjectURL(new Blob([markup],{type:'image/svg+xml'}));
+ img.onload=()=>{const c=document.createElement('canvas');c.width=1200;c.height=720;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,1200,720);URL.revokeObjectURL(url);c.toBlob(b=>b?resolve(b):reject(Error('Could not export PNG')),'image/png')};
+ img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This browser could not render the drawing'))};img.src=url;
+ });
+}
+async function nvRecordWebm(prompt,btn){
+ const sample=nvDiagram(prompt,0);
+ if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw Error('This browser cannot record animations. Try Chrome or Edge on a computer.');
+ const canvas=document.createElement('canvas');canvas.width=800;canvas.height=480;
+ const ctx=canvas.getContext('2d');const stream=canvas.captureStream(12),mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(x=>MediaRecorder.isTypeSupported(x));
+ if(!mime)throw Error('WebM recording is not available on this device.');
+ const recorder=new MediaRecorder(stream,{mimeType:mime}),chunks=[];recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+ const done=new Promise((resolve,reject)=>{recorder.onstop=()=>resolve(new Blob(chunks,{type:'video/webm'}));recorder.onerror=()=>reject(Error('Animation recording failed'))});
+ recorder.start();const old=btn.textContent;btn.disabled=true;btn.textContent='Recording 5-second animation…';
+ try{
+  const start=performance.now();
+  while(performance.now()-start<5000){
+   const f=(performance.now()-start)/5000,markup=nvDiagram(prompt,f).svg;
+   const url=URL.createObjectURL(new Blob([markup],{type:'image/svg+xml'})),img=new Image();
+   await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
+   ctx.drawImage(img,0,0,800,480);URL.revokeObjectURL(url);
+   await new Promise(resolve=>setTimeout(resolve,65));
+  }
+ }finally{recorder.stop();stream.getTracks().forEach(t=>t.stop());btn.disabled=false;btn.textContent=old}
+ const blob=await done;nvDownload(blob,'nexus-study-animation.webm');
+}
+function nvShowVisual(prompt,animate=false){
+ const info=nvDiagram(prompt,animate?0:null),item=document.createElement('div');item.className='ai-message nexus-visual-message';
+ const heading=document.createElement('strong');heading.textContent='Nexus Visual Studio • '+(animate?'Free Animated Diagram':'Free Diagram');item.appendChild(heading);
+ const description=document.createElement('p');description.textContent=info.title+' — '+info.subtitle;item.appendChild(description);
+ const figure=document.createElement('figure');figure.className='nexus-media';figure.innerHTML=info.svg;item.appendChild(figure);
+ const tools=document.createElement('div');tools.className='nexus-visual-actions';
+ const save=document.createElement('button');save.type='button';save.className='secondary-btn';save.textContent='Download PNG';save.onclick=async()=>{try{nvDownload(await nvSvgToPng(info.svg),'nexus-study-diagram.png')}catch(e){msg($('nexusStatus'),e.message,'error')}};tools.appendChild(save);
+ const vector=document.createElement('button');vector.type='button';vector.className='secondary-btn';vector.textContent='Download SVG';vector.onclick=()=>nvDownload(new Blob([info.svg],{type:'image/svg+xml'}),'nexus-study-diagram.svg');tools.appendChild(vector);
+ if(animate){
+  let start=0,run=true;const circle=document.createElement('span');circle.className='nexus-visual-animation-note';circle.textContent='Animated preview • simplified illustration';tools.appendChild(circle);
+  const animateFrame=t=>{if(!run||!figure.isConnected)return;if(!start)start=t;if(t-start>90){try{figure.innerHTML=nvDiagram(prompt,t/5000).svg}catch(_){}start=t}requestAnimationFrame(animateFrame)};
+  requestAnimationFrame(animateFrame);
+  const record=document.createElement('button');record.type='button';record.className='primary-btn';record.textContent='Download 5s WebM';record.onclick=async()=>{try{await nvRecordWebm(prompt,record);msg($('nexusStatus'),'Animation saved as WebM.','success')}catch(e){msg($('nexusStatus'),e.message,'error')}};tools.appendChild(record);
+ }
+ item.appendChild(tools);
+ const note=document.createElement('small');note.textContent='Free browser-rendered educational schematic; not AI image generation or a medical reference image.';item.appendChild(note);
+ $('nexusConversation').appendChild(item);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+}
+
 let nexusVideoJobId='';
 function nexusRenderPicture(base64,prompt){
  const item=document.createElement('div');item.className='ai-message nexus-visual-message';
