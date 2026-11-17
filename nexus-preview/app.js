@@ -310,7 +310,7 @@ async function startQuiz(){
   try{
     if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='mcq'){questions=convertGenerated(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!questions.length)throw new Error('The uploaded material did not produce usable MCQs.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Uploaded Material';renderQ();startClock();return}
     let st=premium?await supabaseClient.rpc('get_secure_quiz_questions_v3',{p_course_code:courseCode,p_limit:wanted}):await supabaseClient.rpc('get_demo_questions',{p_course_code:courseCode});
-    if(!st.error&&Array.isArray(st.data))questions.push(...st.data.slice(0,wanted));
+    if(st.error)throw new Error(st.error.message||'Unable to load stored questions.');if(Array.isArray(st.data))questions.push(...st.data.slice(0,wanted));
     let generatedViaNexus=false;
     // Automatically prepare AI practice when no stored course MCQs are available.
     // The backend deducts free AI questions from the shared daily allowance.
@@ -863,7 +863,7 @@ async function groupResults(){
    const time=participant?.finished_at?roomFinishLabel(participant.finished_at):(r.finished?'Finished':'Not finished');
    const d=document.createElement('div');d.className='leaderboard-row';
    d.innerHTML='<strong>#'+(i+1)+'</strong><div><strong>'+esc(r.display_name||'Student')+'</strong><small>'+esc(time)+'</small></div><strong>'+
-    (groupFormat==='theory'?esc(r.total_score??0)+' • '+esc(r.percentage??0)+'%':esc(r.score??0))+'</strong>';
+    (groupFormat==='theory'?esc(r.total_score??0)+' • '+esc(r.percentage??0)+'%':esc(r.score??0)+' / '+esc(Number(roomData.total_questions)||groupTotal)+' ('+esc(Math.round(100*Number(r.score||0)/Math.max(1,Number(roomData.total_questions)||groupTotal)))+'%)')+'</strong>';
    $('groupLeaderboard').appendChild(d);
   });
   await renderGroupAnswerReview();
