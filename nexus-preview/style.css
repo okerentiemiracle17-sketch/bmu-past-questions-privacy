@@ -1367,3 +1367,61 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 #dashboard .missing-course-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
 #dashboard .missing-course-actions button{min-height:44px;max-width:100%;white-space:normal}
 @media(max-width:600px){#dashboard .missing-course-help{padding:14px}#dashboard .missing-course-actions{display:grid;grid-template-columns:minmax(0,1fr)}#dashboard .missing-course-actions button{width:100%}}
+
+
+/* Nexus BMU mobile cleanup — 2026-11-17 */
+/* Remove the oversized dashboard sales card and isolated date card. */
+#dashboard .continue-study,
+#dashboard .dashboard-date { display:none !important; }
+#dashboard .dashboard-greeting { display:block !important; padding-block:clamp(12px,3vw,24px) !important; }
+#dashboard .dashboard-greeting h1 {font-size:clamp(25px,6vw,36px);line-height:1.18;overflow-wrap:anywhere}
+#dashboard .dashboard-section-title{margin-top:16px}
+#dashboard .dashboard-page .page-head{display:flex;align-items:flex-start;flex-wrap:wrap;gap:12px;min-width:0}
+#dashboard .dashboard-page .page-head>div{min-width:0;max-width:100%}
+#dashboard .dashboard-page .page-head .back-link{display:inline-flex;align-items:center;position:static!important;margin-bottom:12px;max-width:100%;white-space:normal}
+#dashboard .dashboard-page .page-head h2{clear:both;line-height:1.14;margin:7px 0 10px;overflow-wrap:break-word}
+#dashboard .dashboard-page .page-head span{max-width:100%}
+#dashboard .materials-toolbar>*{min-width:0}
+#dashboard .materials-toolbar input,
+#dashboard .materials-toolbar select{box-sizing:border-box;max-width:100%;width:100%}
+#dashboard .nexus-message-content{min-width:0;overflow-wrap:anywhere;line-height:1.65}
+#dashboard .nexus-message-content .nexus-media{margin:12px 0;max-width:100%;overflow:hidden;border-radius:14px;border:1px solid var(--border);background:var(--surface2)}
+#dashboard .nexus-message-content .nexus-media img{display:block;max-width:100%;width:100%;max-height:440px;object-fit:contain}
+#dashboard .nexus-message-content .nexus-media figcaption{padding:9px 12px;font-size:12px;color:var(--soft)}
+#dashboard .nexus-message-content .nexus-video-link{display:flex;gap:9px;align-items:center;padding:13px 15px;margin:12px 0;border:1px solid var(--border);border-radius:12px;color:var(--text);text-decoration:none;background:var(--surface2);overflow-wrap:anywhere}
+@media(max-width:700px){
+ html,body{max-width:100%;overflow-x:clip}
+ .topbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;min-height:68px;padding:10px 14px!important;max-width:100vw;box-sizing:border-box}
+ .topbar .brand{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 auto;width:auto!important;max-width:calc(100% - 100px)}
+ .topbar .brand-text{min-width:0;max-width:100%}
+ .topbar .brand-text h1{font-size:clamp(12px,3.45vw,16px)!important;white-space:normal!important;line-height:1.2;overflow-wrap:break-word}
+ .topbar .brand-text p{display:none}
+ .topbar .brand-logo-box{flex:0 0 42px!important;width:42px!important;height:42px!important}
+ .topbar .brand-logo-box img{width:42px!important;height:42px!important}
+ .topbar .desktop-nav{position:static!important;width:auto!important;flex:0 0 auto!important;display:flex!important;gap:8px!important;align-items:center!important;justify-content:flex-end!important}
+ .topbar .desktop-nav .mobile-nav-toggle{position:static!important;top:auto!important;right:auto!important;display:flex!important;align-items:center;justify-content:center;min-width:44px;min-height:44px;flex:0 0 44px;order:2;z-index:10}
+ .topbar .desktop-nav .nexus-theme-switch{position:static!important;display:flex!important;align-items:center;justify-content:center;flex:0 0 44px!important;width:44px!important;height:44px!important;order:1}
+ .topbar .desktop-nav:not(.mobile-open)>a,
+ .topbar .desktop-nav:not(.mobile-open)>.nav-create-btn{display:none!important}
+ .topbar .desktop-nav.mobile-open{position:static!important}
+ .topbar .desktop-nav.mobile-open>a,
+ .topbar .desktop-nav.mobile-open>.nav-create-btn{position:absolute!important;z-index:110;left:12px;right:12px;width:calc(100% - 24px)!important;max-width:unset!important;display:block!important;background:var(--surface,#fff);color:var(--text,#161616);border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);padding:12px 18px}
+ .topbar .desktop-nav.mobile-open>a:nth-of-type(1){top:72px}
+ .topbar .desktop-nav.mobile-open>a:nth-of-type(2){top:124px}
+ .topbar .desktop-nav.mobile-open>a:nth-of-type(3){top:176px}
+ .topbar .desktop-nav.mobile-open>a:nth-of-type(4){top:228px}
+ .topbar .desktop-nav.mobile-open>a:nth-of-type(5){top:280px}
+ .topbar .desktop-nav.mobile-open>.nav-create-btn{top:334px}
+ .hero-inner{min-width:0;max-width:100%;padding-inline:16px!important}
+ .hero-content,.hero-buttons,.hero-notice{max-width:100%;min-width:0}
+ .hero-buttons>*{min-width:0}
+ .hero-notice{box-sizing:border-box;font-size:12px;line-height:1.5}
+ #dashboard .dashboard-content{min-width:0;max-width:100%;overflow-x:clip}
+ #dashboard .dashboard-page,#dashboard .dashboard-greeting{min-width:0}
+ #dashboard .materials-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important}
+ #dashboard .materials-toolbar>*{width:100%;max-width:100%}
+ #dashboard .materials-toolbar button{min-height:46px}
+ #dashboard .page-head .access-pill{max-width:100%;min-width:0}
+ #dashboard .nexus-mode-tabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+ #dashboard .nexus-mode-tabs .nexus-mode{font-size:clamp(11px,3vw,14px);white-space:normal;min-width:0;padding:10px 6px;overflow-wrap:anywhere}
+}
