@@ -40,7 +40,40 @@ function closeMobile(){$('desktopNav')?.classList.remove('mobile-open');$('mobil
 $('mobileNavToggle')?.addEventListener('click',()=>{const o=$('desktopNav')?.classList.toggle('mobile-open');$('mobileNavToggle')?.setAttribute('aria-expanded',o?'true':'false')});document.querySelectorAll('.desktop-nav a').forEach(a=>a.addEventListener('click',closeMobile));
 function publicView(){stopTimer();stopRoom();$('dashboard')?.classList.add('hidden');$('publicWebsite')?.classList.remove('hidden');document.querySelector('.topbar')?.classList.remove('hidden');document.querySelector('footer')?.classList.remove('hidden')}
 async function dashboardView(u){user=u;document.querySelector('.topbar')?.classList.add('hidden');$('publicWebsite')?.classList.add('hidden');document.querySelector('footer')?.classList.add('hidden');$('dashboard')?.classList.remove('hidden');await loadProfile();updateUser();updateAccess();await loadCourses();await dashboardStats();loadNotices();go('home');animateDash()}
-function go(page){Object.entries(pageMap).forEach(([k,el])=>el?.classList.toggle('hidden',k!==page));document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const dashboardContent=$('dashboard')?.querySelector('.dashboard-content');if(dashboardContent&&getComputedStyle(dashboardContent).overflowY==='auto'){dashboardContent.scrollTo({top:0,behavior:'instant'})}else{window.scrollTo({top:0,behavior:'smooth'})}const active=pageMap[page];if(active){active.classList.remove('page-enter');void active.offsetWidth;active.classList.add('page-enter')}if(page==='solo-learning')loadSoloLearning();if(page==='materials')loadMaterials();if(page==='videos')loadVideos();if(page==='results')loadResults();if(page==='profile'){renderProfile();setProfileEditMode(false)}}
+const soloSessionAnchors=new Map();
+function moveSoloQuizToPage(){
+ const host=$('soloSessionHost');if(!host)return;
+ for(const id of ['quizShell','theoryShell','resultCard','theoryResultCard']){
+  const node=$(id);if(!node||soloSessionAnchors.has(id))continue;
+  const anchor=document.createComment('restore-'+id);
+  node.parentNode?.insertBefore(anchor,node);soloSessionAnchors.set(id,anchor);
+  host.appendChild(node);
+ }
+ host.classList.remove('hidden');
+ $('soloLearningPage')?.classList.add('solo-session-running');
+}
+function restoreSoloQuizPage(){
+ for(const [id,anchor] of soloSessionAnchors){const node=$(id);if(node&&anchor.parentNode)anchor.replaceWith(node)}
+ soloSessionAnchors.clear();
+ $('soloSessionHost')?.classList.add('hidden');
+ $('soloLearningPage')?.classList.remove('solo-session-running');
+}
+async function beginSoloCourseDirect(code,title,format){
+ stopTimer();go('solo-learning');
+ const choice=$('courseSelect');
+ const matched=[...(choice?.options||[])].find(o=>normalCourseCode(o.value)===normalCourseCode(code));
+ if(choice)choice.value=matched?.value||'';
+ if($('manualCourseCode'))$('manualCourseCode').value=matched?'':code;
+ if($('manualCourseName'))$('manualCourseName').value=matched?'':title;
+ if($('questionType'))$('questionType').value=format;
+ moveSoloQuizToPage();
+ msg($('soloDirectMessage'),'Preparing '+code+' '+format.toUpperCase()+' questions…','info');
+ await startQuiz();
+ const active=(!$('quizShell')?.classList.contains('hidden'))?$('quizShell'):(!$('theoryShell')?.classList.contains('hidden')?$('theoryShell'):null);
+ if(active){msg($('soloDirectMessage'),'','info');active.scrollIntoView({behavior:'smooth',block:'start'})}
+ else{const detail=$('practiceSetupMessage')?.textContent||'Unable to start this course. Please try again.';restoreSoloQuizPage();msg($('soloDirectMessage'),detail,'error')}
+}
+function go(page){if(page!=='solo-learning'&&soloSessionAnchors.size)restoreSoloQuizPage();Object.entries(pageMap).forEach(([k,el])=>el?.classList.toggle('hidden',k!==page));document.querySelectorAll('.sidebar-item').forEach(b=>b.classList.toggle('active',b.dataset.page===page));const dashboardContent=$('dashboard')?.querySelector('.dashboard-content');if(dashboardContent&&getComputedStyle(dashboardContent).overflowY==='auto'){dashboardContent.scrollTo({top:0,behavior:'instant'})}else{window.scrollTo({top:0,behavior:'smooth'})}const active=pageMap[page];if(active){active.classList.remove('page-enter');void active.offsetWidth;active.classList.add('page-enter')}if(page==='solo-learning')loadSoloLearning();if(page==='materials')loadMaterials();if(page==='videos')loadVideos();if(page==='results')loadResults();if(page==='profile'){renderProfile();setProfileEditMode(false)}}
 document.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
 $('startBtn')?.addEventListener('click',()=>$('login')?.scrollIntoView({behavior:'smooth'}));['signupBtn','heroCreateBtn','nexusSignupBtn','createAccountBtn'].forEach(id=>$(id)?.addEventListener('click',()=>openModal('signupModal')));$('closeSignup')?.addEventListener('click',()=>closeModal('signupModal'));$('forgotPasswordBtn')?.addEventListener('click',()=>{if($('forgotEmail'))$('forgotEmail').value=$('email')?.value||user?.email||'';openModal('forgotPasswordModal')});$('closeForgotPassword')?.addEventListener('click',()=>closeModal('forgotPasswordModal'));
 function showVerifyEmail(email=''){const field=$('verifyEmailAddress');if(field)field.value=email||$('signupEmail')?.value.trim()||$('email')?.value.trim()||'';msg($('verifyEmailMessage'),'Please check your inbox. You can also resend the confirmation email.');closeModal('signupModal');openModal('verifyEmailModal')}
@@ -488,21 +521,25 @@ function renderSoloCourses(){const grid=$('soloCoursesGrid');if(!grid)return;con
  const unique=new Map();for(const c of match){const key=normalCourseCode(codeOf(c));if(!key)continue;if(!unique.has(key))unique.set(key,c)}
  const rows=[...unique.values()].sort((a,b)=>codeOf(a).localeCompare(codeOf(b)));grid.innerHTML=rows.length?'':'<div class="material-empty">No course is listed for this department and level yet. Enter its course code in the AI Practice form below, or upload course notes to generate practice questions. AI-generated practice is separate from the past-paper archive.</div>';rows.forEach(c=>{const d=document.createElement('article');d.className='solo-course-card';d.innerHTML=`<span class="course-code">${esc(codeOf(c))}</span><h3>${esc(titleOf(c)||'Course')}</h3><p>${esc([c.level,c.department].filter(Boolean).join(' • '))}</p><div class="solo-course-actions"><button class="secondary-btn solo-mcq" type="button">MCQ</button><button class="primary-btn solo-theory" type="button">Theory</button></div>`;d.querySelector('.solo-mcq').addEventListener('click',()=>openSoloCourse(c,'mcq'));d.querySelector('.solo-theory').addEventListener('click',()=>openSoloCourse(c,'theory'));grid.appendChild(d)})}
 async function openSoloCourse(c,format){
- go('past-questions');
- const choice=$('courseSelect'),matched=choice&&[...choice.options].find(o=>normalCourseCode(o.value)===normalCourseCode(codeOf(c)));
- if(choice)choice.value=matched?.value||'';
- $('manualCourseCode').value=matched?'':codeOf(c);
- $('manualCourseName').value=matched?'':titleOf(c);
- $('questionType').value=format;
- msg($('practiceSetupMessage'),`Preparing ${codeOf(c)} ${format==='theory'?'Theory':'MCQ'} practice…`,'info');
- await startQuiz();
+ await beginSoloCourseDirect(codeOf(c),titleOf(c),format);
 }
 async function loadSoloLearning(){renderSoloFilters();renderSoloCourses();await loadSoloLeaderboard()}
 async function loadSoloLeaderboard(){const box=$('soloLeaderboard');if(!box)return;box.innerHTML='<div class="material-empty">Loading leaderboard...</div>';const {data,error}=await supabaseClient.rpc('get_solo_learning_leaderboard',{p_limit:10});if(error){box.innerHTML=`<div class="material-empty">${esc(error.message)}</div>`;return}const rows=Array.isArray(data)?data:[];box.innerHTML=rows.length?'':'<div class="material-empty">No ranked Solo Learning sessions yet.</div>';let myRank=null;rows.forEach((r,i)=>{const d=document.createElement('div');const mine=r.user_id===user?.id;if(mine)myRank=i+1;d.className='solo-leader-row'+(mine?' me':'');d.innerHTML=`<div class="solo-rank">#${i+1}</div><div><strong>${esc(r.display_name||'Student')}</strong><span>${esc(r.sessions??0)} sessions • ${esc(r.total_questions??0)} questions</span></div><div class="solo-score">${Number(r.average_percentage||0).toFixed(1)}%</div>`;box.appendChild(d)});$('soloRankDetail').textContent=myRank?`#${myRank} in Top 10`:'Complete a verified MCQ session to rank.'}
 $('soloCourseSearch')?.addEventListener('input',renderSoloCourses);$('soloLevelFilter')?.addEventListener('change',renderSoloCourses);$('soloDepartmentFilter')?.addEventListener('change',renderSoloCourses);
 $('soloManualMcqBtn')?.addEventListener('click',()=>openManualSolo('mcq'));$('soloManualTheoryBtn')?.addEventListener('click',()=>openManualSolo('theory'));
-async function openManualSolo(format){const code=$('soloManualCode').value.trim().toUpperCase(),name=$('soloManualName').value.trim();if(!code){msg($('soloManualMessage'),'Enter the course code first.','error');return}go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=code;$('manualCourseName').value=name;$('questionType').value=format;msg($('practiceSetupMessage'),`Preparing ${code} practice…`,'info');await startQuiz()}
+async function openManualSolo(format){
+ const code=$('soloManualCode')?.value.trim().toUpperCase()||'',name=$('soloManualName')?.value.trim()||'';
+ if(!code){msg($('soloManualMessage'),'Enter the course code first.','error');return}
+ await beginSoloCourseDirect(code,name,format);
+}
 
+['quitQuizBtn','quitTheoryBtn','newSessionBtn','newTheorySessionBtn'].forEach(id=>{
+ $(id)?.addEventListener('click',()=>{
+  if(soloSessionAnchors.size&&$('quizShell')?.classList.contains('hidden')&&$('theoryShell')?.classList.contains('hidden')&&$('resultCard')?.classList.contains('hidden')&&$('theoryResultCard')?.classList.contains('hidden')){
+   restoreSoloQuizPage();msg($('soloDirectMessage'),'Choose another course to start practising.','info');
+  }
+ });
+});
 /* INDIVIDUAL THEORY PRACTICE */
 async function startTheoryPractice(courseCode,courseTitle,wanted){theoryQuestions=[];theoryAnswers={};theoryGrades={};theoryIndex=0;theoryReviewMode=false;theoryCourseCode=courseCode;theoryCourseTitle=courseTitle||'Theory Practice';$('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Preparing Theory practice...');try{if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='theory'){theoryQuestions=convertTheory(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!theoryQuestions.length)throw new Error('The uploaded material did not produce usable Theory questions.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Uploaded Material';renderTheoryQ();startTheoryClock();return}let missing=wanted;if(premium){try{const r=await supabaseClient.functions.invoke('material-practice-generator',{body:{course_code:courseCode,format:'theory',count:Math.min(30,missing)}});if(!r.error&&r.data?.material_found&&Array.isArray(r.data.validated_questions)){theoryQuestions.push(...convertTheory(r.data.validated_questions,'material_ai'));missing=wanted-theoryQuestions.length}}catch(e){console.warn('theory material fallback skipped',e)}}if(missing>0){theoryQuestions.push(...await generalTheoryAi(courseCode,courseTitle,missing))}const seen=new Set();theoryQuestions=theoryQuestions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);if(!theoryQuestions.length)throw new Error('No Theory questions could be prepared for this course.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('quizShell').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Theory Practice';renderTheoryQ();startTheoryClock()}catch(e){msg($('practiceSetupMessage'),e.message||'Unable to prepare Theory practice.','error')}finally{$('loadQuestionsBtn').disabled=false}}
 function convertTheory(rows,source){return rows.map((x,i)=>{const text=s(x?.question||x?.question_text).trim();if(!text)return null;return{id:`th_${source}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,6)}`,question_text:text,marks:Math.min(20,Math.max(1,Number(x.marks)||10)),explanation:s(x.explanation),model_answer:s(x.model_answer||x.answer),marking_guide:s(x.marking_guide),source_mode:source}}).filter(Boolean)}
