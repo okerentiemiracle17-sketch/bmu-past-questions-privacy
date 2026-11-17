@@ -219,20 +219,24 @@ $('pastPaperYear')?.addEventListener('change',()=>{
  $('pastPaperCount').textContent=item?`${Number(item.question_count)||0} source questions in this examination year. Only supported MCQs will be scored.`:'Select an examination year to see available questions.';
 });
 // Explicit fallback: do not invent an academic year for untagged question banks.
-$('startCoursePracticeFallback')?.addEventListener('click',()=>{
- const courseCode=s($('pastPaperCourse')?.value).trim().toUpperCase();
- if(!courseCode)return msg($('pastPaperMessage'),'Select a course first.','error');
- const select=$('courseSelect');
- const candidate=[...(select?.options||[])].find(o=>normalCourseCode(o.value)===normalCourseCode(courseCode));
- if(select)select.value=candidate?.value||'';
- const name=s($('pastPaperCourse')?.selectedOptions?.[0]?.textContent).split(' — ').slice(1).join(' — ').replace(/ \(semester placement not confirmed\)$/,'');
- if($('manualCourseCode'))$('manualCourseCode').value=candidate?'':courseCode;
- if($('manualCourseName'))$('manualCourseName').value=candidate?'':name;
- if($('questionType'))$('questionType').value='mcq';
- $('practiceSetup')?.classList.remove('hidden');
- $('practiceSetup')?.scrollIntoView({behavior:'smooth',block:'start'});
- msg($('practiceSetupMessage'),courseCode+' selected. Choose your question count and press Start Practice.','success');
+$('startCoursePracticeFallback')?.addEventListener('click',async()=>{
+ const code=s($('pastPaperCourse')?.value).trim().toUpperCase();
+ if(!code)return msg($('pastPaperMessage'),'Select a course first.','error');
+ await nexusStartMissingCourseDirect(code,s($('pastPaperCourse')?.selectedOptions?.[0]?.textContent).split(' — ').slice(1).join(' — '));
 });
+async function nexusStartMissingCourseDirect(code,name=''){
+ const courseCode=s(code).trim().toUpperCase();
+ if(courseCode.length<3){msg($('pastPaperMessage'),'Enter a valid course code (for example BIO 101).','error');return}
+ const select=$('courseSelect'),candidate=[...(select?.options||[])].find(o=>normalCourseCode(o.value)===normalCourseCode(courseCode));
+ if(select)select.value=candidate?.value||'';
+ if($('manualCourseCode'))$('manualCourseCode').value=candidate?'':courseCode;
+ if($('manualCourseName'))$('manualCourseName').value=candidate?'':s(name).trim();
+ if($('questionType'))$('questionType').value='mcq';
+ if($('sessionMinutes'))$('sessionMinutes').value=$('pastPaperMinutes')?.value||'30';
+ $('practiceSetup')?.classList.remove('hidden');
+ msg($('pastPaperMessage'),'Starting '+courseCode+' practice. Nexus AI will generate questions automatically if the course has no stored questions.','info');
+ await startQuiz();
+}
 async function startYearPastPaper(){
  const btn=$('startPastPaperBtn'),course=$('pastPaperCourse').value,semester=Number($('pastPaperSemester').value),year=$('pastPaperYear').value;
  if(!course||!year)return;
@@ -504,7 +508,6 @@ function updateNexusGenerationAccess(){
  }
 }
 function setNexusMode(mode){document.querySelectorAll('.nexus-mode').forEach(b=>b.classList.toggle('active',b.dataset.nexusMode===mode));$('nexusChatMode')?.classList.toggle('hidden',mode!=='chat');$('nexusGenerateMode')?.classList.toggle('hidden',mode!=='generate');$('nexusUploadMode')?.classList.toggle('hidden',mode!=='upload');updateNexusGenerationAccess()}
-document.querySelectorAll('.nexus-mode').forEach(b=>b.classList.toggle('active',b.dataset.nexusMode===mode));$('nexusChatMode')?.classList.toggle('hidden',mode!=='chat');$('nexusGenerateMode')?.classList.toggle('hidden',mode!=='generate');$('nexusUploadMode')?.classList.toggle('hidden',mode!=='upload');updateNexusGenerationAccess()}
 document.querySelectorAll('.nexus-upgrade-action').forEach(b=>b.addEventListener('click',()=>go('subscription')));
 document.querySelectorAll('.nexus-free-questions-action').forEach(b=>b.addEventListener('click',()=>go('past-questions')));
 document.querySelectorAll('.nexus-mode').forEach(b=>b.addEventListener('click',()=>setNexusMode(b.dataset.nexusMode)));
