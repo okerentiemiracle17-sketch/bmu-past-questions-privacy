@@ -196,8 +196,13 @@ async function refreshPastPaperYears(){
   if(!course||!semester)return;
   year.innerHTML='<option value="">Loading available years...</option>';
   try{
-    const {data,error}=await supabaseClient.rpc('list_available_year_question_sets',{p_course_code:course,p_semester:semester});
+    const [yearLookup,bankLookup]=await Promise.all([
+      supabaseClient.rpc('list_available_year_question_sets',{p_course_code:course,p_semester:semester}),
+      supabaseClient.rpc('nexus_published_course_mcq_count',{p_course_code:course})
+    ]);
+    const {data,error}=yearLookup;
     if(error)throw error;if(seq!==pastPaperLoadingSeq)return;
+    const storedCount=bankLookup.error?null:Math.max(0,Number(bankLookup.data)||0);
     pastPaperList=(Array.isArray(data)?data:[]).filter(x=>s(x.academic_session).trim());
     year.innerHTML='<option value="">Select examination year</option>';
     pastPaperList.forEach(item=>{const option=document.createElement('option');option.value=item.academic_session;option.textContent=`${item.academic_session} (${Number(item.question_count)||0} questions)`;year.appendChild(option)});
@@ -211,8 +216,8 @@ async function refreshPastPaperYears(){
     noYear?.classList.toggle('hidden',!!pastPaperList.length);
     if(!pastPaperList.length){
       year.innerHTML='<option value="">No verified examination year available</option>';
-      $('pastPaperCount').textContent='No verified examination-year questions found for this course.';
-      msg($('pastPaperMessage'),'No verified exam-year paper exists for this course yet. Press Start Course Practice above to use stored questions or Nexus AI practice.','info');
+      $('pastPaperCount').textContent=storedCount===null?'No verified examination-year paper. Course practice is available.':storedCount>0?`${storedCount} published practice MCQs available • examination year unverified`:'No verified examination-year papers or stored MCQs found.';
+      msg($('pastPaperMessage'),storedCount>0?`${storedCount} published MCQs already exist for ${course}. Press Start Course Practice to use them; Nexus AI is only used if no stored MCQs are available.`:'No verified exam-year paper exists for this course. Press Start Course Practice to use stored questions or generate AI practice if none exist.','info');
     }
   }catch(err){if(seq!==pastPaperLoadingSeq)return;year.innerHTML='<option value="">Unable to load years</option>';msg($('pastPaperMessage'),err.message||'Unable to load examination years.','error')}
 }
