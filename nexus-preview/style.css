@@ -1448,3 +1448,8 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 /* Free Nexus AI trial is available for up to five generated questions per request. */
 .nexus-free-limit{padding:12px 14px;margin:12px 0;border:1px solid rgba(220,72,90,.25);background:rgba(220,72,90,.065);border-radius:12px;color:var(--soft);font-size:13px;line-height:1.6}
 .nexus-free-limit.hidden{display:none!important}
+
+.nexus-free-access-hint{padding:15px 18px;margin:12px 0;border:1px solid rgba(180,28,52,.30);border-radius:14px;background:rgba(190,32,53,.065);font-size:14px;line-height:1.5;max-width:100%;box-sizing:border-box}
+.nexus-free-access-hint.hidden{display:none!important}
+.nexus-free-access-hint p{margin:10px 0 12px}
+.nexus-free-access-hint .secondary-btn{margin:7px 0}
