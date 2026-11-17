@@ -688,6 +688,7 @@ $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusG
 function nvEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function nvChoose(prompt){
  const q=String(prompt).toLowerCase();
+ if(/\b(frogs?|toads?)\b/.test(q))return 'frog';
  if(/\b(nephron|kidney|renal tubule)\b/.test(q))return 'nephron';
  if(/\b(neuron|nerve cell|neurone)\b/.test(q))return 'neuron';
  if(/\b(mitosis|cell division|prophase|metaphase|anaphase|telophase)\b/.test(q))return 'mitosis';
@@ -706,14 +707,14 @@ function nvParseDiagramRequest(prompt){
  const words={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
  const countMatch=input.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:different|labelled|labeled|clear|separate|educational|simple|biology|distinct|study)\s+){0,5}(?:images?|pictures?|diagrams?|drawings?|illustrations?)\b/i);
  const requested=countMatch?(words[countMatch[1].toLowerCase()]||Number(countMatch[1])):null;
- const patterns=/\b(plant cells?|animal cells?|cell division|mitosis|prophase|metaphase|anaphase|telophase|nephrons?|kidneys?|renal tubules?|neurons?|neurones?|nerve cells?|hearts?|circulation|blood flow|water cycle|electrical circuits?|circuits?|resistors?|batteries?|flowcharts?|workflows?|algorithms?|bar charts?|pie charts?|cells?)\b/gi;
+ const patterns=/\b(frogs?|toads?|plant cells?|animal cells?|cell division|mitosis|prophase|metaphase|anaphase|telophase|nephrons?|kidneys?|renal tubules?|neurons?|neurones?|nerve cells?|hearts?|circulation|blood flow|water cycle|electrical circuits?|circuits?|resistors?|batteries?|flowcharts?|workflows?|algorithms?|bar charts?|pie charts?|cells?)\b/gi;
  const topics=[],seen=new Set();
  for(const match of input.matchAll(patterns)){
   const term=match[0],kind=nvChoose(term);
   if(!kind)continue;
   const key=kind==='cell'?(term.toLowerCase().includes('plant')?'plant cell':'animal cell'):kind;
   if(seen.has(key))continue;seen.add(key);
-  topics.push({kind,topic:kind==='cell'?key:kind==='mitosis'?'mitosis':kind==='nephron'?'nephron':kind==='heart'?'human heart':kind==='neuron'?'neuron':kind==='circuit'?'electrical circuit':kind==='water'?'water cycle':term.toLowerCase()});
+  topics.push({kind,topic:kind==='cell'?key:kind==='mitosis'?'mitosis':kind==='nephron'?'nephron':kind==='frog'?'frog':kind==='heart'?'human heart':kind==='neuron'?'neuron':kind==='circuit'?'electrical circuit':kind==='water'?'water cycle':term.toLowerCase()});
  }
  // A series on cell division has four meaningfully different labelled stages.
  if(topics.length===1&&topics[0].kind==='mitosis'&&(requested===4||(!requested&&/four stages|all stages|stages of cell division/i.test(input)))){
@@ -724,7 +725,7 @@ function nvParseDiagramRequest(prompt){
   if(kind&&kind!=='bar'&&kind!=='pie')topics.push({kind,topic:input});
  }
  if(topics.length===1&&(topics[0].kind==='bar'||topics[0].kind==='pie'))topics[0].topic=input;
- if(!topics.length)throw Error('Supported free labelled images: human heart, nephron, neuron, animal or plant cell, mitosis, circuit, water cycle, flowchart and charts.');
+ if(!topics.length)throw Error('Supported free labelled images: frog, human heart, nephron, neuron, animal or plant cell, mitosis, circuit, water cycle, flowchart and charts.');
  if(requested&&requested>10)throw Error('You can request a maximum of 10 labelled diagrams at once.');
  if(requested&&topics.length<requested)throw Error('For '+requested+' distinct images, please name '+requested+' supported topics (e.g. heart, kidney, neuron), or request 4 stages of mitosis.');
  if(requested&&topics.length>requested)return {topics:topics.slice(0,requested).map(x=>x.topic),requested,labelled:true};
@@ -763,13 +764,42 @@ function nvFreeTable(prompt){
 }
 function nvDiagram(prompt,progress=null){
  const kind=nvChoose(prompt);
- if(!kind)throw new Error('Free diagrams support: human heart, cell, nephron, simple electrical circuit, water cycle, flowchart and bar/pie charts. Try one of these topics.');
+ if(!kind)throw new Error('Free diagrams support: frog, human heart, cell, nephron, simple electrical circuit, water cycle, flowchart and bar/pie charts. Try one of these topics.');
  const line='#b8c9e4',ink='#172846',red='#c22746',blue='#2671b8',green='#29916d';
  const txt=(x,y,label,sz=19,weight=500)=>'<text x="'+x+'" y="'+y+'" font-family="Arial, sans-serif" font-size="'+sz+'" font-weight="'+weight+'" fill="'+ink+'" text-anchor="middle">'+nvEscape(label)+'</text>';
  const pill=(x,y,w,h,label,fill='#f0f5ff')=>'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="17" fill="'+fill+'" stroke="#b7c8df" stroke-width="2"/>'+txt(x+w/2,y+h/2+7,label,18,600);
  const arrow=(x1,y1,x2,y2,color=blue)=>'<path d="M'+x1+' '+y1+' L'+x2+' '+y2+'" stroke="'+color+'" stroke-width="5" fill="none" marker-end="url(#nv-arr)"/>';
  let body='',title='',subtitle='Simplified study schematic • not to anatomical scale',route=[];
- if(kind==='heart'){
+ if(kind==='frog'){
+  title='External anatomy of a frog';
+  const black='#15202d',white='#fff';
+  body='<g stroke="'+black+'" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" fill="'+white+'">'
+  +'<path d="M255 214 C285 157 355 137 430 161 C491 179 536 217 525 280 C514 342 444 362 373 338 C296 344 237 298 255 214Z"/>'
+  +'<path d="M272 225 C231 217 207 202 196 178 C180 161 161 166 144 181 C132 194 129 207 138 214 L163 228 C186 247 220 255 253 258"/>'
+  +'<path d="M302 169 C275 146 271 117 288 105 C307 93 332 106 335 139"/>'
+  +'<path d="M333 163 C351 133 379 131 395 150"/>'
+  +'<circle cx="304" cy="143" r="15"/><circle cx="304" cy="143" r="6" fill="'+black+'"/>'
+  +'<circle cx="381" cy="157" r="12"/><circle cx="381" cy="157" r="5" fill="'+black+'"/>'
+  +'<circle cx="232" cy="195" r="5" fill="'+black+'"/>'
+  +'<ellipse cx="365" cy="194" rx="22" ry="24" fill="none"/>'
+  +'<path d="M168 219 Q208 233 241 225" fill="none"/>'
+  +'<path d="M332 316 Q308 346 280 370 Q259 385 245 366 L229 350 Q218 341 206 356 L184 388 M207 357 L181 364 L149 396 M201 358 L172 340 L147 357" fill="none"/>'
+  +'<path d="M438 324 C479 361 516 376 561 352 L596 328 Q620 320 631 343 L650 365" fill="none"/>'
+  +'<path d="M543 342 Q599 368 610 394 L629 422 M609 396 L579 415 L556 421 M608 398 L643 403 L680 416 M609 398 L624 378 L672 377" fill="none"/>'
+  +'<path d="M477 224 Q538 213 576 244 Q591 258 576 275 L562 287 L600 296 L625 292 M561 285 L586 308 L611 311" fill="none"/>'
+  +'</g>'
+  +'<g stroke="'+black+'" stroke-width="2" fill="none">'
+  +'<path d="M303 127 L269 79 H194"/><path d="M231 186 L167 126 H92"/>'
+  +'<path d="M365 194 L464 101 H565"/><path d="M199 221 L123 263 H55"/>'
+  +'<path d="M405 245 L485 178 H690"/><path d="M548 266 L641 228 H741"/>'
+  +'<path d="M289 348 L221 413 H102"/><path d="M613 386 L696 352 H763"/>'
+  +'</g>'
+  +txt(188,73,'Eye',17,600)+txt(98,120,'Nostril',17,600)
+  +txt(615,94,'Tympanum',17,600)+txt(61,259,'Mouth',17,600)
+  +txt(685,171,'Trunk',17,600)+txt(698,219,'Forelimb',17,600)
+  +txt(125,434,'Hind limb',17,600)+txt(704,346,'Webbed toes',17,600);
+  subtitle='Black-and-white external morphology • schematic, not a specimen photograph';
+ }else if(kind==='heart'){
   title='Four-chamber heart and blood flow';
   body='<path d="M400 106 C330 42 245 120 262 226 C272 307 360 367 400 398 C440 367 529 307 539 226 C556 120 470 42 400 106Z" fill="#fff1f3" stroke="'+red+'" stroke-width="7"/>'
    +'<path d="M400 110 L400 372" stroke="'+red+'" stroke-width="5" stroke-dasharray="12 8"/>'
