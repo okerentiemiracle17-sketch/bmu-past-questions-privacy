@@ -57,7 +57,7 @@ $('forgotPasswordForm')?.addEventListener('submit',async e=>{e.preventDefault();
 $('resendResetOtpBtn')?.addEventListener('click',async()=>{const b=$('resendResetOtpBtn');b.disabled=true;try{await sendResetOtp()}catch(e){msg($('forgotPasswordMessage'),e.message||'Unable to resend OTP.','error');if(resetSeconds<=0)b.disabled=false}});
 async function loadProfile(){profile=null;if(!user?.id)return;const {data,error}=await supabaseClient.from('profiles').select('id,full_name,email,programme,level,subscription_status,subscription_started_at,subscription_expires_at').eq('id',user.id).maybeSingle();if(!error)profile=data||{}}
 function updateUser(){const n=displayName(),first=n.trim().split(/\s+/)[0]||'Student';$('welcomeUser').textContent=`Good to see you, ${first}.`;$('headerUserName').textContent=first;$('profileInitial').textContent=first[0]?.toUpperCase()||'S'}
-function updateAccess(){premium=isPremium(profile);const ex=expiry(profile?.subscription_expires_at);$('subscriptionBadge').textContent=premium?'Premium Active':'Free Access';$('subscriptionMeta').textContent=premium?(ex?`Until ${ex}`:'Full Access'):'5 MCQs per course';$('pqAccessLabel').textContent=premium?'Premium Active':'Free Access';$('pqAccessDetail').textContent=premium?'Up to 70 questions':'5 demo questions per course';$('accessCardTitle').textContent=premium?'Premium Access':'Free Access';$('accessCardText').textContent=premium?'Stored questions first, then approved-material Nexus AI, then validated general AI fallback.':'Free users can practise up to 5 stored demo questions per course.';$('questionCount').disabled=!premium;$('materialsAccessLabel').textContent=premium?'Premium Library':'Library Preview';$('materialsAccessDetail').textContent=premium?'Books, notes and slides are unlocked':'Browse all resources • Premium opens locked items';renderProfile()}
+function updateAccess(){premium=isPremium(profile);const ex=expiry(profile?.subscription_expires_at);$('subscriptionBadge').textContent=premium?'Premium Active':'Free Access';$('subscriptionMeta').textContent=premium?(ex?`Until ${ex}`:'Full Access'):'5 MCQs per course';$('pqAccessLabel').textContent=premium?'Premium Active':'Free Access';$('pqAccessDetail').textContent=premium?'Up to 70 questions':'5 demo questions per course';$('accessCardTitle').textContent=premium?'Premium Access':'Free Access';$('accessCardText').textContent=premium?'Stored questions first, then approved-material Nexus AI, then validated general AI fallback.':'Free users can practise up to 5 stored demo questions per course.';$('questionCount').disabled=!premium;updateNexusGenerationAccess();$('materialsAccessLabel').textContent=premium?'Premium Library':'Library Preview';$('materialsAccessDetail').textContent=premium?'Books, notes and slides are unlocked':'Browse all resources • Premium opens locked items';renderProfile()}
 const CORE_100_LEVEL_CODES=['BIO101','BIO107','CHM101','CHM107','COS101','COS107','GST111','MTH101','MTH111','PHY101','PHY107','STA111','BIO102','BIO108','CHM102','CHM108','COS102','COS108','GST112','GST114','MTH102','PHY102','PHY108'];
 function normalCourseCode(v){return s(v).toUpperCase().replace(/\s+/g,'')}
 let departmentCurriculum=[];
@@ -436,7 +436,21 @@ function openMissingCourseNexus(mode,fromSolo=false){
 $('pastPaperAiFallback')?.addEventListener('click',()=>openMissingCourseNexus('generate'));
 $('pastPaperUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload'));
 $('soloUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload',true));
-function setNexusMode(mode){document.querySelectorAll('.nexus-mode').forEach(b=>b.classList.toggle('active',b.dataset.nexusMode===mode));$('nexusChatMode')?.classList.toggle('hidden',mode!=='chat');$('nexusGenerateMode')?.classList.toggle('hidden',mode!=='generate');$('nexusUploadMode')?.classList.toggle('hidden',mode!=='upload')}
+function updateNexusGenerationAccess(){
+ const unlocked=isPremium(profile);
+ for(const id of ['nexusGenerateMode','nexusUploadMode']){
+   const el=$(id);if(!el)continue;
+   el.classList.toggle('nexus-premium-locked',!unlocked);
+   el.querySelector('.nexus-premium-gate')?.classList.toggle('hidden',unlocked);
+ }
+ if(!unlocked){
+   msg($('nexusGenerateMessage'),'');
+   if($('nexusUploadFilesInfo'))$('nexusUploadFilesInfo').textContent='Premium unlocks question generation from uploaded files.';
+ }
+}
+function setNexusMode(mode){document.querySelectorAll('.nexus-mode').forEach(b=>b.classList.toggle('active',b.dataset.nexusMode===mode));$('nexusChatMode')?.classList.toggle('hidden',mode!=='chat');$('nexusGenerateMode')?.classList.toggle('hidden',mode!=='generate');$('nexusUploadMode')?.classList.toggle('hidden',mode!=='upload');updateNexusGenerationAccess()}
+document.querySelectorAll('.nexus-upgrade-action').forEach(b=>b.addEventListener('click',()=>go('subscription')));
+document.querySelectorAll('.nexus-free-questions-action').forEach(b=>b.addEventListener('click',()=>go('past-questions')));
 document.querySelectorAll('.nexus-mode').forEach(b=>b.addEventListener('click',()=>setNexusMode(b.dataset.nexusMode)));
 $('newNexusChatBtn')?.addEventListener('click',()=>{$('nexusConversation').innerHTML='<div class="ai-message"><strong>Nexus AI</strong><p>New conversation. What would you like to study?</p></div>';setNexusMode('chat')});
 $('openPastQuestionsFromAi')?.addEventListener('click',()=>go('past-questions'));
