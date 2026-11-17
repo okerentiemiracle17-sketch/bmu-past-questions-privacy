@@ -106,8 +106,9 @@ async function nexusClaimFree(key,count,courseCode='GENERAL'){
  if(error)throw new Error(error.message||'Five-question limit reached for this course.');
  return Math.max(0,Math.min(5,Number(data)||0));
 }
-async function nexusRefreshDailyLimit(courseCode='GENERAL'){
+async function nexusRefreshDailyLimit(courseCode=''){
  if(isPremium(profile))return;
+ if(!courseCode){document.querySelectorAll('.nexus-daily-remaining').forEach(el=>el.textContent='5 free questions per course each day');return}
  try{const remaining=await nexusFreeRemaining(courseCode);document.querySelectorAll('.nexus-daily-remaining').forEach(el=>el.textContent=remaining+' / 5 free questions left for '+nexusCourseKey(courseCode)+' today')}catch(e){console.warn(e)}
 }
 function applyFreeStudyLimits(){
@@ -385,7 +386,7 @@ async function startQuiz(){
     if(premium&&missing>0){msg($('practiceSetupMessage'),'Checking approved course materials...');try{const r=await supabaseClient.functions.invoke('material-practice-generator',{body:{course_code:courseCode,format:'mcq',count:Math.min(30,missing)}});if(!r.error&&r.data?.material_found&&Array.isArray(r.data.validated_questions)){questions.push(...convertGenerated(r.data.validated_questions,'material_ai'));missing=wanted-questions.length}}catch(e2){console.warn('material fallback skipped',e2)}}
     if(missing>0&&premium){msg($('practiceSetupMessage'),'Nexus AI is preparing additional questions...');try{questions.push(...await generalAi(courseCode,courseTitle,missing))}catch(err){if(!questions.length)throw err;console.warn('Additional AI questions unavailable; using published course questions.',err);msg($('practiceSetupMessage'),'Starting with available published questions.','info')}}
     const seen=new Set();questions=questions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);
-    if(!questions.length)throw new Error('Neither stored questions nor AI practice questions were available for this course. Please try again shortly.');if(!premium&&!generatedViaNexus)void nexusRefreshDailyLimit();
+    if(!questions.length)throw new Error('Neither stored questions nor AI practice questions were available for this course. Please try again shortly.');if(!premium)void nexusRefreshDailyLimit(courseCode);
     seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard')?.classList.add('hidden');$('theoryShell')?.classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Practice Session';renderQ();startClock();$('yearPastPapers')?.classList.add('hidden');$('quizShell')?.scrollIntoView({behavior:'smooth',block:'start'});msg($('pastPaperMessage'),'','info')
   }catch(e2){const message=e2.message||'Unable to prepare questions.';msg($('practiceSetupMessage'),message,'error');msg($('pastPaperMessage'),message,'error');console.warn('Unable to start course practice:',e2)}finally{$('loadQuestionsBtn').disabled=false}
 }
