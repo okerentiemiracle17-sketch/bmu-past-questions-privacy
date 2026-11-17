@@ -1453,3 +1453,9 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 .nexus-free-access-hint.hidden{display:none!important}
 .nexus-free-access-hint p{margin:10px 0 12px}
 .nexus-free-access-hint .secondary-btn{margin:7px 0}
+
+/* Direct missing-course Nexus AI practice entry. */
+.missing-course-code-inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:14px 0;min-width:0}
+.missing-course-code-inputs label{font-weight:650;font-size:12px;color:var(--soft)}
+.missing-course-code-inputs input{min-width:0;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;padding:13px;background:var(--surface2);color:var(--text)}
+@media(max-width:600px){.missing-course-code-inputs{grid-template-columns:1fr}.missing-course-actions{display:grid;grid-template-columns:1fr;gap:10px}.missing-course-actions button{width:100%;min-height:46px}}
