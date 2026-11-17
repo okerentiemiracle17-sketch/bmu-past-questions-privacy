@@ -1484,3 +1484,5 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 .nexus-message-content th,.nexus-message-content td{padding:12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
 .nexus-message-content th{background:rgba(214,72,88,.10);font-weight:750}
 @media(max-width:650px){.nexus-capability-bar{margin:10px 0}.nexus-capability-bar select{width:100%;max-width:none}.nexus-visual-message img,.nexus-visual-message video{max-height:440px}}
+
+.nexus-table-export{display:block!important;margin:10px 12px 12px;min-height:38px;font-size:12px;white-space:normal}
