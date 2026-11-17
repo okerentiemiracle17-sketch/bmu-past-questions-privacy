@@ -1425,3 +1425,22 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
  #dashboard .nexus-mode-tabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
  #dashboard .nexus-mode-tabs .nexus-mode{font-size:clamp(11px,3vw,14px);white-space:normal;min-width:0;padding:10px 6px;overflow-wrap:anywhere}
 }
+
+
+/* Explicit Premium gating for Nexus AI question-generation tools. */
+#nexusGenerateMode.nexus-premium-locked textarea,
+#nexusGenerateMode.nexus-premium-locked .generator-controls,
+#nexusGenerateMode.nexus-premium-locked #nexusGenerateMessage,
+#nexusUploadMode.nexus-premium-locked > label,
+#nexusUploadMode.nexus-premium-locked > input,
+#nexusUploadMode.nexus-premium-locked > small,
+#nexusUploadMode.nexus-premium-locked .generator-controls,
+#nexusUploadMode.nexus-premium-locked #nexusUploadFilesInfo{
+ display:none!important
+}
+.nexus-premium-gate{padding:20px;border:1px solid rgba(221,74,88,.35);border-radius:16px;background:rgba(180,28,52,.07);margin:14px 0;max-width:100%;box-sizing:border-box}
+.nexus-premium-gate.hidden{display:none!important}
+.nexus-premium-gate strong{font-size:18px;color:var(--text)}
+.nexus-premium-gate p{font-size:14px;line-height:1.65;margin:12px 0 16px;color:var(--soft)}
+.nexus-premium-gate button{margin:5px 10px 5px 0;max-width:100%;min-height:44px}
+@media(max-width:600px){.nexus-premium-gate{padding:16px}.nexus-premium-gate button{width:100%;margin:5px 0}}
