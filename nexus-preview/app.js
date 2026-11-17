@@ -733,7 +733,13 @@ $('nexusCheckVideo')?.addEventListener('click',async()=>{
  finally{btn.disabled=false}
 });
 
-$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;const mode=$('nexusOutputMode')?.value||'text';if(mode==='image'||mode==='video'){
+$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode=$('nexusOutputMode')?.value||'text';
+ if(mode==='text'){
+  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q))mode='image';
+  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?video\b/i.test(q))mode='video';
+  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode='table';
+ }
+ if(mode==='image'||mode==='video'){
  addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),mode==='image'?'Generating your picture…':'Submitting video render…','info');try{const result=await nexusMediaRequest({action:mode,prompt:q});if(mode==='image'&&result.image_base64){nexusRenderPicture(result.image_base64,q);msg($('nexusStatus'),'Image generated successfully. Use Download PNG to save it.','success')}else if(mode==='video'&&result.job_id){nexusVideoJobId=result.job_id;$('nexusVideoJobBar')?.classList.remove('hidden');$('nexusVideoJobInfo').textContent=result.message||'Video queued. Check back for the finished clip.';msg($('nexusStatus'),'Video request accepted. Use Check Video Status to retrieve it.','info')}else throw Error('No media was returned.')}catch(err){addChat('Nexus AI',err.message||'Could not generate this media.','ai-message');msg($('nexusStatus'),err.message||'Media unavailable.','error')}finally{$('nexusAskBtn').disabled=false}return}
 addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),'Nexus AI is thinking...');try{const r=await supabaseClient.functions.invoke('ai-tutor',{body:{action:'explain',question:q,programme:profile?.programme||'',style:$('nexusStyle').value,format_instruction:mode==='table'?'Provide a concise, accurate Markdown table. Use pipes and a header separator row, followed by short explanatory notes.':'Give a moderate, clear student-friendly answer with short headings, short paragraphs and lists when useful.',output_format:mode}});if(r.error){
  let serverBody={};
