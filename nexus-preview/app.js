@@ -139,7 +139,7 @@ function pastPaperScopedCourses(){
 function resetPastPaperYears(){
  pastPaperLoadingSeq++;pastPaperList=[];
  const el=$('pastPaperYear');if(el){el.innerHTML='<option value="">Choose course first</option>';el.disabled=true}
- if($('startPastPaperBtn'))$('startPastPaperBtn').disabled=true;
+ if($('startPastPaperBtn')){$('startPastPaperBtn').disabled=true;$('startPastPaperBtn').textContent='Start year-based CBT'};
  $('pastPaperNoYearFallback')?.classList.add('hidden');
  if($('pastPaperCount'))$('pastPaperCount').textContent='Select an examination year to see available questions.';
  msg($('pastPaperMessage'),'');
@@ -191,7 +191,7 @@ $('pastPaperSemester')?.addEventListener('change',refreshPastPaperCourseOptions)
 async function refreshPastPaperYears(){
   const course=$('pastPaperCourse')?.value||'',semester=Number($('pastPaperSemester')?.value||0),year=$('pastPaperYear');
   if(!year)return;
-  const seq=++pastPaperLoadingSeq;pastPaperList=[];year.disabled=true;year.innerHTML='<option value="">Select a course first</option>';$('startPastPaperBtn').disabled=true;
+  const seq=++pastPaperLoadingSeq;pastPaperList=[];year.disabled=true;year.innerHTML='<option value="">Select a course first</option>';$('startPastPaperBtn').disabled=true;$('startPastPaperBtn').textContent='Start year-based CBT';
   $('pastPaperCount').textContent='';msg($('pastPaperMessage'),'');
   if(!course||!semester)return;
   year.innerHTML='<option value="">Loading available years...</option>';
@@ -202,12 +202,17 @@ async function refreshPastPaperYears(){
     year.innerHTML='<option value="">Select examination year</option>';
     pastPaperList.forEach(item=>{const option=document.createElement('option');option.value=item.academic_session;option.textContent=`${item.academic_session} (${Number(item.question_count)||0} questions)`;year.appendChild(option)});
     year.disabled=!pastPaperList.length;
+    const mainStart=$('startPastPaperBtn');
+    if(mainStart){
+      mainStart.disabled=false;
+      mainStart.textContent=pastPaperList.length?'Start year-based CBT':'Start Course Practice';
+    }
     const noYear=$('pastPaperNoYearFallback');
     noYear?.classList.toggle('hidden',!!pastPaperList.length);
     if(!pastPaperList.length){
       year.innerHTML='<option value="">No verified examination year available</option>';
       $('pastPaperCount').textContent='No verified examination-year questions found for this course.';
-      msg($('pastPaperMessage'),'This course currently has no year-labelled past papers. Use Course Practice for stored or AI-assisted questions.','info');
+      msg($('pastPaperMessage'),'No verified exam-year paper exists for this course yet. Press Start Course Practice above to use stored questions or Nexus AI practice.','info');
     }
   }catch(err){if(seq!==pastPaperLoadingSeq)return;year.innerHTML='<option value="">Unable to load years</option>';msg($('pastPaperMessage'),err.message||'Unable to load examination years.','error')}
 }
@@ -215,7 +220,8 @@ $('pastPaperCourse')?.addEventListener('change',refreshPastPaperYears);
 
 $('pastPaperYear')?.addEventListener('change',()=>{
  const choice=$('pastPaperYear').value,item=pastPaperList.find(x=>x.academic_session===choice);
- $('startPastPaperBtn').disabled=!item;
+ $('startPastPaperBtn').disabled=!item&&!!pastPaperList.length;
+ $('startPastPaperBtn').textContent=item||pastPaperList.length?'Start year-based CBT':'Start Course Practice';
  $('pastPaperCount').textContent=item?`${Number(item.question_count)||0} source questions in this examination year. Only supported MCQs will be scored.`:'Select an examination year to see available questions.';
 });
 // Explicit fallback: do not invent an academic year for untagged question banks.
@@ -239,7 +245,15 @@ async function nexusStartMissingCourseDirect(code,name=''){
 }
 async function startYearPastPaper(){
  const btn=$('startPastPaperBtn'),course=$('pastPaperCourse').value,semester=Number($('pastPaperSemester').value),year=$('pastPaperYear').value;
- if(!course||!year)return;
+ if(!course)return;
+ if(!year&&!pastPaperList.length){
+   btn.disabled=true;btn.textContent='Preparing course practice…';
+   try{await nexusStartMissingCourseDirect(course,s($('pastPaperCourse')?.selectedOptions?.[0]?.textContent).split(' — ').slice(1).join(' — ').replace(/ \(semester placement not confirmed\)$/,''))}
+   catch(e){msg($('pastPaperMessage'),e.message||'Unable to prepare course practice.','error')}
+   finally{btn.disabled=false;btn.textContent='Start Course Practice'}
+   return;
+ }
+ if(!year){msg($('pastPaperMessage'),'Select an available examination year.','info');return}
  if(!isPremium(profile)){msg($('pastPaperMessage'),'Premium is required to practise complete year-based past papers. You can still use your free random practice questions.','error');return}
  btn.disabled=true;msg($('pastPaperMessage'),'Loading examination questions securely...');
  try{
