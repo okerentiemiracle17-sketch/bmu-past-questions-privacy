@@ -700,6 +700,41 @@ function nvChoose(prompt){
  if(/\b(bar chart|bar graph|histogram|graph|plot)\b/.test(q))return 'bar';
  return '';
 }
+
+function nvParseDiagramRequest(prompt){
+ const input=String(prompt||'').slice(0,1500);
+ const words={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+ const countMatch=input.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:different|labelled|labeled|clear|separate|educational|simple|biology|distinct|study)\s+){0,5}(?:images?|pictures?|diagrams?|drawings?|illustrations?)\b/i);
+ const requested=countMatch?(words[countMatch[1].toLowerCase()]||Number(countMatch[1])):null;
+ const patterns=/\b(plant cells?|animal cells?|cell division|mitosis|prophase|metaphase|anaphase|telophase|nephrons?|kidneys?|renal tubules?|neurons?|neurones?|nerve cells?|hearts?|circulation|blood flow|water cycle|electrical circuits?|circuits?|resistors?|batteries?|flowcharts?|workflows?|algorithms?|bar charts?|pie charts?|cells?)\b/gi;
+ const topics=[],seen=new Set();
+ for(const match of input.matchAll(patterns)){
+  const term=match[0],kind=nvChoose(term);
+  if(!kind)continue;
+  const key=kind==='cell'?(term.toLowerCase().includes('plant')?'plant cell':'animal cell'):kind;
+  if(seen.has(key))continue;seen.add(key);
+  topics.push({kind,topic:kind==='cell'?key:kind==='mitosis'?'mitosis':kind==='nephron'?'nephron':kind==='heart'?'human heart':kind==='neuron'?'neuron':kind==='circuit'?'electrical circuit':kind==='water'?'water cycle':term.toLowerCase()});
+ }
+ // A series on cell division has four meaningfully different labelled stages.
+ if(topics.length===1&&topics[0].kind==='mitosis'&&(requested===4||(!requested&&/four stages|all stages|stages of cell division/i.test(input)))){
+  return {topics:['prophase','metaphase','anaphase','telophase'],requested:4,labelled:true};
+ }
+ if(topics.length===0){
+  const kind=nvChoose(input);
+  if(kind&&kind!=='bar'&&kind!=='pie')topics.push({kind,topic:input});
+ }
+ if(!topics.length)throw Error('Supported free labelled images: human heart, nephron, neuron, animal or plant cell, mitosis, circuit, water cycle, flowchart and charts.');
+ if(requested&&requested>10)throw Error('You can request a maximum of 10 labelled diagrams at once.');
+ if(requested&&topics.length<requested)throw Error('For '+requested+' distinct images, please name '+requested+' supported topics (e.g. heart, kidney, neuron), or request 4 stages of mitosis.');
+ if(requested&&topics.length>requested)return {topics:topics.slice(0,requested).map(x=>x.topic),requested,labelled:true};
+ return {topics:topics.map(x=>x.topic),requested:requested||topics.length,labelled:true};
+}
+async function nvReserveDiagramBatch(topics){
+ const {data,error}=await supabaseClient.rpc('nexus_reserve_diagram_batch',{p_topics:topics});
+ if(error)throw new Error(error.message||'Unable to check your daily image allowance.');
+ const result=Array.isArray(data)?data[0]:data;
+ return {used:Number(result?.used)||0,remaining:Number(result?.remaining)||0,limit:Number(result?.daily_limit)||4};
+}
 function nvChartValues(prompt){
  const data=[];const re=/([A-Za-z][A-Za-z0-9 _-]{0,25}?)\s*(?:[:=]|\s)\s*(\d+(?:\.\d+)?)(?=\s*[,;\n]|$)/g;
  for(const m of String(prompt).matchAll(re)){const label=m[1].trim().replace(/^(?:(?:make|create|generate|draw|show|plot)\s+(?:me\s+)?(?:a\s+)?(?:bar\s+|pie\s+)?(?:chart|graph|table)\s+(?:of\s+)?|(?:chart|plot|graph|of|with|data|values|compare)\s+)/i,'').trim();const value=Number(m[2]);if(label&&Number.isFinite(value)&&value>=0)data.push({label,value});if(data.length>=8)break}
@@ -947,14 +982,25 @@ $('nexusCheckVideo')?.addEventListener('click',async()=>{
 
 $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode='text'; // No visible mode selection: route from the student's message.
  if(mode==='text'){
-  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q)&&nvChoose(q))mode='diagram';
+  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:\d+\s+)?(?:an?\s+)?(?:labelled\s+|labeled\s+)?(?:images?|diagrams?|pictures?)\b|create\s+(?:\d+\s+)?(?:an?\s+)?(?:labelled\s+|labeled\s+)?(?:images?|pictures?|illustrations?|diagrams?)\b|make\s+(?:\d+\s+)?(?:an?\s+)?(?:labelled\s+|labeled\s+)?(?:images?|pictures?|diagrams?)\b)/i.test(q))mode='diagram';
   else if((/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make|animate|show)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q)||/^(?:please\s+|can you\s+|could you\s+)?animate\s+/i.test(q))&&nvChoose(q))mode='animation';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode=nvChartValues(q).length>=2?'free-table':'table';else if(/\b(?:bar chart|pie chart|bar graph|pie graph)\b/i.test(q)&&nvChartValues(q).length>=2)mode='diagram';
  }
  if(mode==='diagram'||mode==='animation'||mode==='free-table'){
-  addChat('You',q,'user-message');$('nexusQuestion').value='';
-  try{if(mode==='free-table')nvFreeTable(q);else nvShowVisual(q,mode==='animation');msg($('nexusStatus'),mode==='free-table'?'Free data table ready. Download CSV.':'Free visual ready. Download PNG, SVG or WebM (animations).','success')}
-  catch(err){addChat('Nexus AI',err.message||'This free visual is not available.','ai-message');msg($('nexusStatus'),err.message||'Visual unavailable.','error')}
+  addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;
+  try{
+   if(mode==='free-table'){nvFreeTable(q);msg($('nexusStatus'),'Free data table ready. Download CSV.','success')}
+   else if(mode==='animation'){nvShowVisual(q,true);msg($('nexusStatus'),'Free animation ready. Download WebM where supported.','success')}
+   else{
+    const batch=nvParseDiagramRequest(q);
+    // Render and validate every diagram before reserving the daily allowance.
+    for(const topic of batch.topics)nvDiagram(topic);
+    const usage=await nvReserveDiagramBatch(batch.topics);
+    for(const topic of batch.topics)nvShowVisual(topic,false);
+    msg($('nexusStatus'),batch.topics.length+' labelled diagram'+(batch.topics.length===1?'':'s')+' ready • '+usage.remaining+'/'+usage.limit+' daily image allowance remaining.','success');
+   }
+  }catch(err){addChat('Nexus AI',err.message||'This free visual is not available.','ai-message');msg($('nexusStatus'),err.message||'Visual unavailable.','error')}
+  finally{$('nexusAskBtn').disabled=false}
   return;
  }
  if(mode==='image'||mode==='video'){
