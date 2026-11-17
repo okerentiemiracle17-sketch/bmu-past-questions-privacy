@@ -688,7 +688,7 @@ $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusG
 function nvEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function nvChoose(prompt){
  const q=String(prompt).toLowerCase();
- if(/\b(frogs?|toads?)\b/.test(q))return 'frog';
+ if(/\b(frogs?|frongs?|toads?)\b/.test(q))return 'frog';
  if(/\b(nephron|kidney|renal tubule)\b/.test(q))return 'nephron';
  if(/\b(neuron|nerve cell|neurone)\b/.test(q))return 'neuron';
  if(/\b(mitosis|cell division|prophase|metaphase|anaphase|telophase)\b/.test(q))return 'mitosis';
@@ -707,7 +707,7 @@ function nvParseDiagramRequest(prompt){
  const words={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
  const countMatch=input.match(/\b(\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:(?:different|labelled|labeled|clear|separate|educational|simple|biology|distinct|study)\s+){0,5}(?:images?|pictures?|diagrams?|drawings?|illustrations?)\b/i);
  const requested=countMatch?(words[countMatch[1].toLowerCase()]||Number(countMatch[1])):null;
- const patterns=/\b(frogs?|toads?|plant cells?|animal cells?|cell division|mitosis|prophase|metaphase|anaphase|telophase|nephrons?|kidneys?|renal tubules?|neurons?|neurones?|nerve cells?|hearts?|circulation|blood flow|water cycle|electrical circuits?|circuits?|resistors?|batteries?|flowcharts?|workflows?|algorithms?|bar charts?|pie charts?|cells?)\b/gi;
+ const patterns=/\b(frogs?|frongs?|toads?|plant cells?|animal cells?|cell division|mitosis|prophase|metaphase|anaphase|telophase|nephrons?|kidneys?|renal tubules?|neurons?|neurones?|nerve cells?|hearts?|circulation|blood flow|water cycle|electrical circuits?|circuits?|resistors?|batteries?|flowcharts?|workflows?|algorithms?|bar charts?|pie charts?|cells?)\b/gi;
  const topics=[],seen=new Set();
  for(const match of input.matchAll(patterns)){
   const term=match[0],kind=nvChoose(term);
