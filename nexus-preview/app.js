@@ -868,8 +868,8 @@ async function nexusMediaRequest(body){
 }
 $('nexusOutputMode')?.addEventListener('change',()=>{
  const mode=$('nexusOutputMode')?.value||'text',hint=$('nexusMediaNote');
- if(hint)hint.textContent=mode==='image'?'Images: 1 free image daily; Premium: up to 3 daily. Provider credits required.':mode==='video'?'Video: Premium, up to 1 short clip daily. Requires a connected video provider.':mode==='table'?'Ask Nexus to create professional, readable comparison tables.':'Text chat: 10 requests daily for free users.';
- if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='image'?'Describe a labelled drawing, diagram or picture…':mode==='video'?'Describe a short educational video…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
+ if(hint)hint.textContent=mode==='diagram'?'100% free: labelled schematic diagrams and charts; download PNG or SVG.':mode==='animation'?'100% free: short animated schematics; export WebM where supported.':mode==='image'?'Photorealistic AI images require a funded API key. Use Free Diagram instead.':mode==='video'?'AI-generated videos require a paid provider. Use Free Animation instead.':mode==='table'?'Ask Nexus for readable tables. Text AI chat quota applies.':'Text chat: 10 requests daily for free users.';
+ if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='diagram'?'Try: Draw a labelled heart, nephron, plant cell, circuit or chart BIO: 12, CHM: 8…':mode==='animation'?'Try: Animate blood circulation, the water cycle or a circuit…':mode==='image'?'Describe an AI-generated picture (paid API required)…':mode==='video'?'Describe a generated AI video (paid API required)…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
 });
 $('nexusCheckVideo')?.addEventListener('click',async()=>{
  if(!nexusVideoJobId)return;
@@ -890,9 +890,15 @@ $('nexusCheckVideo')?.addEventListener('click',async()=>{
 
 $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;let mode=$('nexusOutputMode')?.value||'text';
  if(mode==='text'){
-  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q))mode='image';
-  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?video\b/i.test(q))mode='video';
+  if(/^(?:please\s+|can you\s+|could you\s+)?(?:draw\b|sketch\b|illustrate\b|generate\s+(?:an?\s+)?image\b|create\s+(?:an?\s+)?(?:image|picture|illustration|diagram)\b|make\s+(?:an?\s+)?(?:image|picture|labelled diagram)\b)/i.test(q))mode='diagram';
+  else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q))mode='animation';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode='table';
+ }
+ if(mode==='diagram'||mode==='animation'){
+  addChat('You',q,'user-message');$('nexusQuestion').value='';
+  try{nvShowVisual(q,mode==='animation');msg($('nexusStatus'),'Free visual ready. Download PNG, SVG or WebM (animations).','success')}
+  catch(err){addChat('Nexus AI',err.message||'This free visual is not available.','ai-message');msg($('nexusStatus'),err.message||'Visual unavailable.','error')}
+  return;
  }
  if(mode==='image'||mode==='video'){
  addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),mode==='image'?'Generating your picture…':'Submitting video render…','info');try{const result=await nexusMediaRequest({action:mode,prompt:q});if(mode==='image'&&result.image_base64){nexusRenderPicture(result.image_base64,q);msg($('nexusStatus'),'Image generated successfully. Use Download PNG to save it.','success')}else if(mode==='video'&&result.job_id){nexusVideoJobId=result.job_id;$('nexusVideoJobBar')?.classList.remove('hidden');$('nexusVideoJobInfo').textContent=result.message||'Video queued. Check back for the finished clip.';msg($('nexusStatus'),'Video request accepted. Use Check Video Status to retrieve it.','info')}else throw Error('No media was returned.')}catch(err){addChat('Nexus AI',err.message||'Could not generate this media.','ai-message');msg($('nexusStatus'),err.message||'Media unavailable.','error')}finally{$('nexusAskBtn').disabled=false}return}
