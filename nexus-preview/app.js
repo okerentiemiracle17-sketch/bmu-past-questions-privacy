@@ -783,7 +783,25 @@ function nexusRichText(text){
   }
   flush();return out.join("");
 }
-function addChat(who,text,cl){const d=document.createElement('div');d.className=cl;d.innerHTML=`<strong>${esc(who)}</strong><div class="nexus-message-content">${cl==='ai-message'?nexusRichText(text):`<p>${esc(text)}</p>`}</div>`;$('nexusConversation').appendChild(d);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;if(cl==='ai-message'&&window.MathJax?.typesetPromise){window.MathJax.typesetPromise([d]).catch(()=>{})}}
+function addChat(who,text,cl){
+ const d=document.createElement('div');d.className=cl;
+ d.innerHTML=`<strong>${esc(who)}</strong><div class="nexus-message-content">${cl==='ai-message'?nexusRichText(text):`<p>${esc(text)}</p>`}</div>`;
+ if(cl==='ai-message'){
+  d.querySelectorAll('.nexus-table-wrap').forEach((wrap,i)=>{
+   const table=wrap.querySelector('table');if(!table)return;
+   const download=document.createElement('button');download.type='button';download.className='secondary-btn nexus-table-export';download.textContent='Download table as CSV';
+   download.addEventListener('click',()=>{
+    const csv=[...table.rows].map(row=>[...row.cells].map(cell=>'"'+(cell.textContent||'').replaceAll('"','""')+'"').join(',')).join('\r\n');
+    const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='nexus-study-table-'+(i+1)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),5000);
+   });
+   wrap.appendChild(download);
+  });
+ }
+ $('nexusConversation').appendChild(d);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+ if(cl==='ai-message'&&window.MathJax?.typesetPromise){window.MathJax.typesetPromise([d]).catch(()=>{})}
+}
 
 /* MATERIALS */
 async function loadMaterials(){if(!user)return;msg($('materialsLibraryMessage'),'Loading the study library...');msg($('myUploadsMessage'),'Loading your submissions...');let approved=[];const {data:libraryData,error:libraryError}=await supabaseClient.rpc('get_website_library',{p_query:'',p_limit:100});if(libraryError)msg($('materialsLibraryMessage'),libraryError.message,'error');else{approved=(libraryData||[]).map(r=>({...r,course:{code:r.course_code,course_code:r.course_code}}));const books=approved.filter(r=>['textbook','study_note','lecture_slide'].includes(s(r.material_type).toLowerCase())).length;msg($('materialsLibraryMessage'),approved.length?`${approved.length} resources available • ${books} books, notes or slides${isPremium(profile)?' • Premium access active':' • Browse everything; Premium opens locked resources'}`:'No approved materials are available yet.')}materials=approved;const {data,error}=await supabaseClient.from('student_material_uploads').select('id,uploader_id,title,course_code,level,material_type,file_name,file_extension,storage_path,description,status,created_at,updated_at,approved_at').eq('uploader_id',user.id).order('created_at',{ascending:false});uploads=error?[]:(data||[]);msg($('myUploadsMessage'),error?error.message:(uploads.length?'':'You have not submitted any materials yet.'),error?'error':'info');renderMaterials();renderUploads()}
