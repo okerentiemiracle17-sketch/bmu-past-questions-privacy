@@ -311,11 +311,21 @@ async function startQuiz(){
     if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='mcq'){questions=convertGenerated(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!questions.length)throw new Error('The uploaded material did not produce usable MCQs.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Uploaded Material';renderQ();startClock();return}
     let st=premium?await supabaseClient.rpc('get_secure_quiz_questions_v3',{p_course_code:courseCode,p_limit:wanted}):await supabaseClient.rpc('get_demo_questions',{p_course_code:courseCode});
     if(!st.error&&Array.isArray(st.data))questions.push(...st.data.slice(0,wanted));
+    let generatedViaNexus=false;
+    // Automatically prepare AI practice when no stored course MCQs are available.
+    // The backend deducts free AI questions from the shared daily allowance.
+    if(!questions.length&&!premium){
+      msg($('practiceSetupMessage'),'No stored questions for '+courseCode+'. Nexus AI is preparing your free practice questions…','info');
+      const generated=await generateTopicQuestionSet('mcq',studyAiTopic('mcq',courseCode,courseTitle),wanted);
+      questions.push(...convertGenerated(generated,'general_ai'));
+      generatedViaNexus=true;
+      void nexusRefreshDailyLimit();
+    }
     let missing=wanted-questions.length;
     if(premium&&missing>0){msg($('practiceSetupMessage'),'Checking approved course materials...');try{const r=await supabaseClient.functions.invoke('material-practice-generator',{body:{course_code:courseCode,format:'mcq',count:Math.min(30,missing)}});if(!r.error&&r.data?.material_found&&Array.isArray(r.data.validated_questions)){questions.push(...convertGenerated(r.data.validated_questions,'material_ai'));missing=wanted-questions.length}}catch(e2){console.warn('material fallback skipped',e2)}}
     if(missing>0&&premium){msg($('practiceSetupMessage'),'Nexus AI is preparing remaining questions...');questions.push(...await generalAi(courseCode,courseTitle,missing))}
     const seen=new Set();questions=questions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);
-    if(!questions.length)throw new Error('No usable questions are available for this course yet.');if(!premium){const granted=await nexusClaimFree('solo:'+crypto.randomUUID(),questions.length);questions=questions.slice(0,granted);void nexusRefreshDailyLimit()}
+    if(!questions.length)throw new Error('Neither stored questions nor AI practice questions were available for this course. Please try again shortly.');if(!premium&&!generatedViaNexus){const granted=await nexusClaimFree('solo:'+crypto.randomUUID(),questions.length);questions=questions.slice(0,granted);void nexusRefreshDailyLimit()}
     seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard')?.classList.add('hidden');$('theoryShell')?.classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.remove('hidden');$('quizCourseCode').textContent=courseCode;$('quizCourseTitle').textContent=courseTitle||'Practice Session';renderQ();startClock()
   }catch(e2){msg($('practiceSetupMessage'),e2.message||'Unable to prepare questions.','error')}finally{$('loadQuestionsBtn').disabled=false}
 }
