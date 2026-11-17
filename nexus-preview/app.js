@@ -330,7 +330,7 @@ async function startQuiz(){
   const courseTitle=selectedCode?(selected?.dataset?.title||''):manualName;
   if(!courseCode){msg($('practiceSetupMessage'),'Select a listed course or enter a course code.','error');return}
   const format=$('questionType')?.value||'mcq';
-  premium=isPremium(profile);let remaining=70,existingCourseAllowance=0;try{if(!premium){const [balance,existing]=await Promise.all([nexusFreeRemaining(courseCode),supabaseClient.rpc('nexus_existing_free_course_allowance',{p_course_code:courseCode})]);remaining=balance;if(!existing.error)existingCourseAllowance=Math.max(0,Math.min(5,Number(existing.data)||0));}}catch(e){msg($('practiceSetupMessage'),e.message||'Cannot check free question balance.','error');msg($('pastPaperMessage'),e.message||'Cannot check free question balance.','error');return}if(!premium&&remaining<1&&existingCourseAllowance<1){const notice='Your 5 free questions for today have been used. They reset at midnight WAT. Upgrade to Premium for more.';msg($('practiceSetupMessage'),notice,'error');msg($('pastPaperMessage'),notice,'info');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,existingCourseAllowance||remaining);
+  premium=isPremium(profile);let remaining=70,existingCourseAllowance=0;try{if(!premium){const [balance,existing]=await Promise.all([nexusFreeRemaining(courseCode),supabaseClient.rpc('nexus_existing_free_course_allowance',{p_course_code:courseCode})]);remaining=balance;if(!existing.error)existingCourseAllowance=Math.max(0,Math.min(5,Number(existing.data)||0));}}catch(e){msg($('practiceSetupMessage'),e.message||'Cannot check free question balance.','error');msg($('pastPaperMessage'),e.message||'Cannot check free question balance.','error');return}if(!premium&&remaining<1&&existingCourseAllowance<1&&!pendingGeneratedPractice){const notice='Your 5 free questions for today have been used. They reset at midnight WAT. Upgrade to Premium for more.';msg($('practiceSetupMessage'),notice,'error');msg($('pastPaperMessage'),notice,'info');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,pendingGeneratedPractice?.rows?.length||existingCourseAllowance||remaining);
   if(format==='theory'){await startTheoryPractice(courseCode,courseTitle,wanted);return}
   questions=[];answers={};reviews={};aiReviews={};qIndex=0;submitted=false;reviewMode=false;
   $('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Checking stored questions...');
@@ -400,7 +400,7 @@ async function generateTopicQuestionSet(format,topic,count,courseCode=''){
 }
 async function generalAi(courseCode,courseTitle,count){
  const topic=studyAiTopic('mcq',courseCode,courseTitle);
- return convertGenerated(await generateTopicQuestionSet('mcq',topic,count),'general_ai');
+ return convertGenerated(await generateTopicQuestionSet('mcq',topic,count,courseCode),'general_ai');
 }
 function startClock(){stopTimer();$('quizTimer').textContent=fmt(seconds);timer=setInterval(async()=>{seconds--;$('quizTimer').textContent=fmt(seconds);if(seconds<=0){stopTimer();await submitQuiz(true)}},1000)}
 function renderQ(){const q=questions[qIndex];if(!q)return;$('questionNumber').textContent=`Question ${qIndex+1}`;$('questionText').textContent=q.question_text;$('quizProgress').textContent=`${qIndex+1} / ${questions.length}`;$('progressBar').style.width=`${((qIndex+1)/questions.length)*100}%`;$('previousQuestionBtn').disabled=qIndex===0;$('nextQuestionBtn').disabled=qIndex===questions.length-1;$('mcqOptions').innerHTML='';['A','B','C','D','E'].forEach(l=>{const t=opt(q,l);if(!t)return;const b=document.createElement('button');b.className='option-button'+(answers[q.id]===l?' selected':'');b.disabled=submitted;b.innerHTML=`<span class="option-key">${l}</span><span>${esc(t)}</span>`;b.addEventListener('click',()=>{if(submitted)return;answers[q.id]=l;renderQ()});$('mcqOptions').appendChild(b)});renderNav();if(submitted&&reviewMode)renderReview(q);else $('reviewBox').classList.add('hidden')}
@@ -409,7 +409,30 @@ $('previousQuestionBtn')?.addEventListener('click',()=>{if(qIndex>0){qIndex--;re
 $('quitQuizBtn')?.addEventListener('click',()=>{if(!confirm('Quit this Past Questions session?\nYour current answers in this session will be lost.'))return;stopTimer();questions=[];answers={};reviews={};aiReviews={};qIndex=0;submitted=false;reviewMode=false;$('quizShell').classList.add('hidden');$('resultCard').classList.add('hidden');resetYearPastPaperUi();$('practiceSetup').classList.remove('hidden');$('submitQuizBtn').classList.remove('hidden');msg($('practiceSetupMessage'),'Session closed. Choose a course when you are ready.','info')});
 async function submitQuiz(timed=false){if(submitted)return;if(!timed&&!confirm(`Submit now?\nAnswered ${Object.keys(answers).length} of ${questions.length}.`))return;stopTimer();$('submitQuizBtn').disabled=true;try{if(pastPaperMode)await scoreYearPastPaper();else if(premium)await scorePremium();else await scoreFree();submitted=true;$('quizShell').classList.add('hidden');$('resultCard').classList.remove('hidden')}catch(e2){alert(e2.message||'Unable to submit.')}finally{$('submitQuizBtn').disabled=false}}
 async function scorePremium(){reviews={};let correct=0,verifiedSaved=false;const stored=questions.filter(q=>!q.nexus_ai),ai=questions.filter(q=>q.nexus_ai);if(stored.length){const a={};stored.forEach(q=>a[String(q.id)]=answers[q.id]||'');if(ai.length===0){const sc=await supabaseClient.rpc('submit_secure_solo_quiz',{p_course_code:$('quizCourseCode').textContent,p_course_title:$('quizCourseTitle').textContent,p_answers:a});if(sc.error)throw sc.error;const sr=row(sc.data);correct=Number(sr.correct??0)||0;verifiedSaved=true}else{const sc=await supabaseClient.rpc('score_secure_quiz',{p_answers:a});if(sc.error)throw sc.error;const sr=row(sc.data);correct+=Number(sr.correct??sr.correct_count??0)||0}const rv=await supabaseClient.rpc('review_secure_quiz',{p_answers:a});if(rv.error)throw rv.error;(Array.isArray(rv.data)?rv.data:[]).forEach(r=>reviews[r.id??r.question_id]=r)}ai.forEach(q=>{const r=aiReviews[q.id];if(!r)return;const selected=s(answers[q.id]).toUpperCase(),ok=!!selected&&selected===s(r.correct_option).toUpperCase();if(ok)correct++;reviews[q.id]={...r,selected_option:selected,is_correct:ok}});await finishSolo(correct,verifiedSaved)}
-async function scoreFree(){reviews={};let correct=0;const a={};for(const q of questions){const selected=s(answers[q.id]).toUpperCase();a[String(q.id)]=selected;if(!selected){reviews[q.id]={selected_option:'',correct_option:'',explanation:'You did not answer this question.',is_correct:false};continue}const {data,error}=await supabaseClient.rpc('answer_demo_question',{p_question_id:q.id,p_selected_option:selected});if(error)throw error;const r=row(data);reviews[q.id]={...r,selected_option:selected};if(r.is_correct)correct++}let verifiedSaved=false;try{const save=await supabaseClient.rpc('submit_demo_solo_quiz',{p_course_code:$('quizCourseCode').textContent,p_course_title:$('quizCourseTitle').textContent,p_answers:a});if(!save.error)verifiedSaved=true}catch(_){}await finishSolo(correct,verifiedSaved)}
+async function scoreFree(){
+ reviews={};let correct=0;const storedAnswers={};let hasStored=false,hasAI=false;
+ for(const q of questions){
+  const selected=s(answers[q.id]).toUpperCase();
+  if(q.nexus_ai){
+   hasAI=true;const known=aiReviews[q.id]||{};
+   const right=s(known.correct_option).toUpperCase();
+   const ok=!!selected&&!!right&&selected===right;
+   reviews[q.id]={...known,selected_option:selected,is_correct:ok};
+   if(ok)correct++;
+   continue;
+  }
+  hasStored=true;storedAnswers[String(q.id)]=selected;
+  if(!selected){reviews[q.id]={selected_option:'',correct_option:'',explanation:'You did not answer this question.',is_correct:false};continue}
+  const {data,error}=await supabaseClient.rpc('answer_demo_question',{p_question_id:q.id,p_selected_option:selected});
+  if(error)throw error;
+  const result=row(data);reviews[q.id]={...result,selected_option:selected};if(result.is_correct)correct++;
+ }
+ let verifiedSaved=false;
+ if(hasStored&&!hasAI){
+  try{const save=await supabaseClient.rpc('submit_demo_solo_quiz',{p_course_code:$('quizCourseCode').textContent,p_course_title:$('quizCourseTitle').textContent,p_answers:storedAnswers});if(!save.error)verifiedSaved=true}catch(e){console.warn('Verified result save',e)}
+ }
+ await finishSolo(correct,verifiedSaved);
+}
 async function finishSolo(correct,verifiedSaved=false){const total=questions.length,pct=total?Math.round(correct/total*100):0;$('resultTitle').textContent=pct>=70?'Strong Performance':pct>=50?'Good Attempt':'Keep Practising';$('resultSummary').textContent=`You scored ${correct} out of ${total}. ${verifiedSaved?'This verified session counts toward Solo Learning rank.':'AI-assisted sessions are saved to your history but do not change the secure leaderboard.'}`;$('resultStats').innerHTML=`<div><strong>${correct}/${total}</strong><span>SCORE</span></div><div><strong>${pct}%</strong><span>PERCENTAGE</span></div><div><strong>${Object.keys(answers).length}</strong><span>ANSWERED</span></div>`;if(!verifiedSaved){try{await supabaseClient.from('quiz_session_results').insert({user_id:user.id,course_code:$('quizCourseCode').textContent,course_title:$('quizCourseTitle').textContent,session_type:questions.some(q=>q.nexus_ai)?'nexus_ai':'solo',question_format:'mcq',score:correct,total,percentage:pct,source_breakdown:{stored:questions.filter(q=>!q.nexus_ai).length,ai:questions.filter(q=>q.nexus_ai).length},verified_for_leaderboard:false})}catch(e2){console.warn(e2)}}dashboardStats();if(!pageMap['solo-learning']?.classList.contains('hidden'))loadSoloLeaderboard()}
 $('reviewAnswersBtn')?.addEventListener('click',()=>{reviewMode=true;submitted=true;qIndex=0;$('resultCard').classList.add('hidden');$('quizShell').classList.remove('hidden');$('submitQuizBtn').classList.add('hidden');renderQ()});const quizExplanationCache=new Map(),quizExplanationPending=new Set();
 function weakQuizExplanation(value){
@@ -485,7 +508,7 @@ async function startTheoryPractice(courseCode,courseTitle,wanted){theoryQuestion
 function convertTheory(rows,source){return rows.map((x,i)=>{const text=s(x?.question||x?.question_text).trim();if(!text)return null;return{id:`th_${source}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,6)}`,question_text:text,marks:Math.min(20,Math.max(1,Number(x.marks)||10)),explanation:s(x.explanation),model_answer:s(x.model_answer||x.answer),marking_guide:s(x.marking_guide),source_mode:source}}).filter(Boolean)}
 async function generalTheoryAi(courseCode,courseTitle,count){
  const topic=studyAiTopic('theory',courseCode,courseTitle);
- return convertTheory(await generateTopicQuestionSet('theory',topic,count),'general_ai');
+ return convertTheory(await generateTopicQuestionSet('theory',topic,count,courseCode),'general_ai');
 }
 function startTheoryClock(){stopTimer();$('theoryTimer').textContent=fmt(seconds);timer=setInterval(async()=>{seconds--;$('theoryTimer').textContent=fmt(seconds);if(seconds<=0){stopTimer();await submitTheory(true)}},1000)}
 function saveTheoryAnswer(){const q=theoryQuestions[theoryIndex];if(q)theoryAnswers[q.id]=$('theoryAnswer').value}
@@ -530,7 +553,7 @@ $('pastPaperUploadFallback')?.addEventListener('click',()=>openMissingCourseNexu
 $('soloUploadFallback')?.addEventListener('click',()=>openMissingCourseNexus('upload',true));
 function updateNexusGenerationAccess(){
  const free=!isPremium(profile);
- document.querySelectorAll('.nexus-free-limit').forEach(el=>el.classList.toggle('hidden',!free));void nexusRefreshDailyLimit();
+ document.querySelectorAll('.nexus-free-limit').forEach(el=>el.classList.toggle('hidden',!free));
  for(const id of ['nexusGenerateCount','nexusUploadCount']){
   const el=$(id);if(!el)continue;
   for(const opt of el.options){opt.disabled=free&&Number(opt.value||opt.textContent)>5}
