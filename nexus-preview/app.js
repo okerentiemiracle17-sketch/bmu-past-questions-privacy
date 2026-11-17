@@ -688,7 +688,9 @@ $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusG
 function nvEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function nvChoose(prompt){
  const q=String(prompt).toLowerCase();
- if(/\b(nephron|kidney tubule)\b/.test(q))return 'nephron';
+ if(/\b(nephron|kidney|renal tubule)\b/.test(q))return 'nephron';
+ if(/\b(neuron|nerve cell|neurone)\b/.test(q))return 'neuron';
+ if(/\b(mitosis|cell division|prophase|metaphase|anaphase|telophase)\b/.test(q))return 'mitosis';
  if(/\b(heart|circulation|blood flow)\b/.test(q))return 'heart';
  if(/\b(plant cell|animal cell|cell organelles|cell structure)\b/.test(q))return 'cell';
  if(/\b(circuit|resistor|battery|electricity)\b/.test(q))return 'circuit';
@@ -744,6 +746,46 @@ function nvDiagram(prompt,progress=null){
    +arrow(332,323,207,310,blue)+arrow(595,310,468,323,red);
   route=[[220,180],[305,180],[335,250],[255,315],[160,315]];
   subtitle='RA right atrium • RV right ventricle • LA left atrium • LV left ventricle';
+ }else if(kind==='neuron'){
+  title='Neuron: labelled nerve cell';
+  body='<circle cx="258" cy="249" r="86" fill="#e5d9ff" stroke="#745ea9" stroke-width="6"/>'
+  +'<ellipse cx="258" cy="249" rx="31" ry="28" fill="#a990d9"/>'
+  +'<path d="M341 248 H624" fill="none" stroke="'+blue+'" stroke-width="16" stroke-linecap="round"/>'
+  +'<path d="M196 220 L98 133 M196 265 L77 302 M219 172 L214 89 M201 287 L133 371" fill="none" stroke="'+blue+'" stroke-width="12" stroke-linecap="round"/>'
+  +'<path d="M618 248 L707 165 M618 248 L732 250 M618 248 L709 352" fill="none" stroke="'+blue+'" stroke-width="9" stroke-linecap="round"/>'
+  +'<rect x="371" y="232" width="51" height="32" rx="13" fill="#f7d789" stroke="#d3a248"/><rect x="448" y="232" width="51" height="32" rx="13" fill="#f7d789" stroke="#d3a248"/><rect x="525" y="232" width="51" height="32" rx="13" fill="#f7d789" stroke="#d3a248"/>'
+  +txt(258,251,'Nucleus',17,600)+txt(254,369,'Cell body (soma)',17,600)
+  +txt(118,96,'Dendrites',17,600)+txt(468,197,'Axon / myelin',18,600)
+  +txt(666,405,'Axon terminals',16,600)+arrow(355,307,620,307,blue);
+  subtitle='Dendrites receive input • axon conducts signals • terminals pass signals onward';
+  route=[[258,249],[348,248],[465,248],[620,248],[718,250]];
+ }else if(kind==='mitosis'){
+  const phases=['Prophase','Metaphase','Anaphase','Telophase'];
+  const match=prompt.match(/\b(prophase|metaphase|anaphase|telophase)\b/i);
+  const phase=match?phases.find(x=>x.toLowerCase()===match[1].toLowerCase()):phases[0];
+  title='Mitosis: '+phase;
+  body='<ellipse cx="400" cy="240" rx="190" ry="145" fill="#e7f5fd" stroke="'+blue+'" stroke-width="8"/>'
+   +'<path d="M237 240 H563" stroke="#9abbd5" stroke-width="3" stroke-dasharray="8 7"/>';
+  if(phase==='Prophase'){
+   body+='<circle cx="400" cy="240" r="104" fill="#efe2ff" stroke="#9274b5" stroke-width="5" stroke-dasharray="8 6"/>'
+   +'<path d="M348 183 l33 57 -33 48 M451 183 l-33 57 33 48" stroke="'+red+'" stroke-width="13" fill="none"/>'
+   +txt(400,395,'Chromosomes condense',19,600);
+  }else if(phase==='Metaphase'){
+   for(const yy of [164,219,274])body+='<path d="M381 '+yy+' l38 45 M419 '+yy+' l-38 45" stroke="'+red+'" stroke-width="9" fill="none"/>';
+   body+='<path d="M237 241 L399 185 M237 241 L399 241 M563 241 L399 241 M563 241 L399 300" stroke="#3d9f8f" stroke-width="3"/>'
+   +txt(400,395,'Chromosomes align at equator',19,600);
+  }else if(phase==='Anaphase'){
+   for(const yy of [174,232,286])body+='<path d="M326 '+yy+' l-32 23 32 23 M473 '+yy+' l32 23 -32 23" stroke="'+red+'" stroke-width="8" fill="none"/>';
+   body+=arrow(366,240,273,240,green)+arrow(431,240,528,240,green)+txt(400,395,'Chromatids move to opposite poles',19,600);
+  }else{
+   body+='<circle cx="330" cy="238" r="65" fill="#eedfff" stroke="#9274b5" stroke-width="4"/>'
+   +'<circle cx="470" cy="238" r="65" fill="#eedfff" stroke="#9274b5" stroke-width="4"/>'
+   +'<path d="M305 211 l30 28 -30 24 M454 211 l30 28 -30 24" stroke="'+red+'" stroke-width="9" fill="none"/>'
+   +'<path d="M400 101 Q372 240 400 379" stroke="#7b8c9f" stroke-width="5" fill="none" stroke-dasharray="6 5"/>'
+   +txt(400,395,'Two daughter nuclei form',19,600);
+  }
+  subtitle='Simplified labelled stage: '+phase+' • not to cellular scale';
+  route=[[237,240],[400,240],[563,240]];
  }else if(kind==='cell'){
   title='Cell structure and organelles';
   const plant=/plant/.test(prompt.toLowerCase());
