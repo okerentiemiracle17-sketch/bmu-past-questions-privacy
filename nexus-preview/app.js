@@ -902,6 +902,8 @@ async function renderGroupAnswerReview(){
  }));
  if(roomData?.id===roomId)el.innerHTML=out.join('')||'<div class="material-empty">No answer review is available for this session.</div>';
 }
+$('groupFreeUpgradeBtn')?.addEventListener('click',()=>go('subscription'));
+$('groupFreeQuizUpgradeBtn')?.addEventListener('click',()=>go('subscription'));
 $('backToStudyRoomsBtn')?.addEventListener('click',leaveRoom);
 
 /* RESULTS */
