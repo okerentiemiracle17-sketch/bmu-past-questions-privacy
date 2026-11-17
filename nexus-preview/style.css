@@ -1486,3 +1486,12 @@ body.dark .spectate-actions button[data-accept="false"]{background:#25252a!impor
 @media(max-width:650px){.nexus-capability-bar{margin:10px 0}.nexus-capability-bar select{width:100%;max-width:none}.nexus-visual-message img,.nexus-visual-message video{max-height:440px}}
 
 .nexus-table-export{display:block!important;margin:10px 12px 12px;min-height:38px;font-size:12px;white-space:normal}
+
+
+/* Free Nexus Visual Studio schematic / animation viewer */
+.nexus-visual-message .nexus-media svg{display:block;width:100%;height:auto;max-width:800px;background:#fff;border:1px solid #d8e1ee;border-radius:14px}
+.nexus-visual-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.nexus-visual-actions button{min-height:42px;max-width:100%;font-size:13px}
+.nexus-visual-message small{display:block;font-size:12px;line-height:1.5;color:var(--soft);margin-top:9px}
+.nexus-visual-animation-note{font-size:12px;color:var(--soft)}
+@media(max-width:540px){.nexus-visual-actions button{flex:1 1 calc(50% - 10px);min-width:0;white-space:normal}.nexus-visual-message figure{margin-left:0;margin-right:0}}
