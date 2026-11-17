@@ -289,17 +289,25 @@ function convertGenerated(rows,source){const letters=['A','B','C','D'];return ro
 
 async function generateTopicQuestionSet(format,topic,count){
  count=Math.min(isPremium(profile)?30:5,Math.max(1,Number(count)||5));
- const result=[],seen=new Set();let tries=0,empty=0;
- const maxAttempts=Math.min(14,Math.max(5,Math.ceil(count/7)*3));
- while(result.length<count&&tries<maxAttempts&&empty<3){
-  const need=Math.min(10,count-result.length);
-  const prior=result.slice(-10).map(q=>String(q.question||'').slice(0,100));
-  const scopedTopic=topic+(prior.length?' Do not repeat: '+JSON.stringify(prior).slice(0,1400):'');
+ const result=[],seen=new Set();let tries=0,empty=0,lastError='';
+ const maxAttempts=Math.min(6,Math.max(2,Math.ceil(count/5)+1));
+ while(result.length<count&&tries<maxAttempts&&empty<2){
+  const need=Math.min(5,count-result.length);
+  const recent=result.slice(-8).map(q=>String(q.question||'').slice(0,100));
+  const scopedTopic=topic+(recent.length?' Avoid duplicate questions: '+JSON.stringify(recent).slice(0,850):'');
   tries++;
   try{
-   const r=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count:need,topic:scopedTopic}});
-   if(r.error||r.data?.error)throw new Error('AI provider unavailable');
-   const rows=Array.isArray(r.data?.result?.questions)?r.data.result.questions:[];
+   const response=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count:need,topic:scopedTopic}});
+   if(response.error){
+    let body={};
+    try{if(response.error.context?.json)body=await response.error.context.json()}catch(_){}
+    const status=response.error.context?.status;
+    const message=String(body?.message||body?.error||response.error.message||'Request failed');
+    if(status===401||status===403||message==='PREMIUM_REQUIRED')throw new Error('AI access could not be verified. Sign out and sign in again, then retry. Free users can generate up to 5 questions.');
+    throw new Error(message);
+   }
+   if(response.data?.error)throw new Error(response.data.message||response.data.error);
+   const rows=Array.isArray(response.data?.result?.questions)?response.data.result.questions:[];
    let added=0;
    for(const q of rows){
     if(!validStudyAiQuestion(q,format))continue;
@@ -308,9 +316,15 @@ async function generateTopicQuestionSet(format,topic,count){
     if(result.length>=count)break;
    }
    empty=added?0:empty+1;
-  }catch(e){console.warn('AI question batch unavailable',e);empty++}
+   if(!added)lastError='The AI service returned no valid questions for this request.';
+  }catch(e){
+   lastError=String(e?.message||'AI service unavailable');
+   console.warn('Nexus AI question generation:',lastError);
+   if(/access could not be verified|sign out and sign in again/i.test(lastError))throw new Error(lastError);
+   empty++;
+  }
  }
- if(!result.length)throw new Error('Questions are temporarily unavailable. Try again with a more specific course or topic, or upload clear course notes.');
+ if(!result.length)throw new Error(lastError||'No valid questions could be generated right now. Try again in a moment.');
  return result.slice(0,count);
 }
 async function generalAi(courseCode,courseTitle,count){
