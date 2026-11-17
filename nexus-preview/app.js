@@ -682,7 +682,60 @@ $('openMaterialUploadBtn')?.addEventListener('click',async()=>{
  finally{button.disabled=false;button.textContent=original||'Generate from Upload'}
 });
 $('nexusGenerateBtn')?.addEventListener('click',async()=>{const prompt=$('nexusGeneratePrompt')?.value.trim();if(!prompt){msg($('nexusGenerateMessage'),'Describe the course or topic first.','error');return}const format=$('nexusGenerateType').value,count=Math.min(isPremium(profile)?30:5,Number($('nexusGenerateCount').value)||5);$('nexusGenerateBtn').disabled=true;msg($('nexusGenerateMessage'),`Nexus AI is generating ${count} ${format.toUpperCase()} questions…`);try{const rows=await generateTopicQuestionSet(format,prompt,count);pendingGeneratedPractice={format,topic:prompt,rows,count};const m=prompt.toUpperCase().match(/\b[A-Z]{2,4}\s*-?\s*\d{3}\b/);go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=m?m[0].replace(/\s*-\s*/,' ').trim():'AI';$('manualCourseName').value=prompt;$('questionType').value=format;$('questionCount').value=String(count);msg($('practiceSetupMessage'),`${rows.length} valid ${format.toUpperCase()} questions were prepared with answers and explanations. ${rows.length<count?'Some requested questions could not be verified, so only the usable ones are included. ':''}Choose a timer and press Start Practice.`,'success')}catch(e){msg($('nexusGenerateMessage'),e.message||'Nexus AI could not generate the questions.','error')}finally{$('nexusGenerateBtn').disabled=false}});
-$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),'Nexus AI is thinking...');try{const r=await supabaseClient.functions.invoke('ai-tutor',{body:{action:'explain',question:q,programme:profile?.programme||'',style:$('nexusStyle').value,format_instruction:'Give a moderate, clear student-friendly answer with short headings, short paragraphs and lists when useful.'}});if(r.error){
+
+let nexusVideoJobId='';
+function nexusRenderPicture(base64,prompt){
+ const item=document.createElement('div');item.className='ai-message nexus-visual-message';
+ const title=document.createElement('strong');title.textContent='Nexus AI • Generated Image';item.appendChild(title);
+ const figure=document.createElement('figure');figure.className='nexus-media';
+ const img=document.createElement('img');img.src='data:image/png;base64,'+base64;img.alt=prompt;img.loading='lazy';figure.appendChild(img);
+ const caption=document.createElement('figcaption');caption.textContent=prompt;figure.appendChild(caption);
+ const download=document.createElement('a');download.className='secondary-btn nexus-image-download';download.textContent='Download PNG';download.href=img.src;download.download='nexus-study-illustration.png';figure.appendChild(download);
+ item.appendChild(figure);$('nexusConversation').appendChild(item);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+}
+function nexusRenderVideo(url,prompt){
+ const item=document.createElement('div');item.className='ai-message nexus-visual-message';
+ const title=document.createElement('strong');title.textContent='Nexus AI • Generated Video';item.appendChild(title);
+ const safe=new URL(url);if(safe.protocol!=='https:')throw Error('Video link must use HTTPS');
+ const video=document.createElement('video');video.src=safe.href;video.controls=true;video.preload='metadata';video.playsInline=true;item.appendChild(video);
+ const caption=document.createElement('p');caption.textContent=prompt;item.appendChild(caption);
+ const link=document.createElement('a');link.href=safe.href;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open video in new tab';item.appendChild(link);
+ $('nexusConversation').appendChild(item);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+}
+async function nexusMediaRequest(body){
+ const {data,error}=await supabaseClient.functions.invoke('nexus-media',{body});
+ if(error){
+  let details={};try{if(error.context?.json)details=await error.context.json()}catch(_){}
+  throw new Error(details?.error||error.message||'Media generation is unavailable');
+ }
+ if(data?.error)throw new Error(data.error);
+ return data;
+}
+$('nexusOutputMode')?.addEventListener('change',()=>{
+ const mode=$('nexusOutputMode')?.value||'text',hint=$('nexusMediaNote');
+ if(hint)hint.textContent=mode==='image'?'Images: 1 free image daily; Premium: up to 3 daily. Provider credits required.':mode==='video'?'Video: Premium, up to 1 short clip daily. Requires a connected video provider.':mode==='table'?'Ask Nexus to create professional, readable comparison tables.':'Text chat: 10 requests daily for free users.';
+ if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='image'?'Describe a labelled drawing, diagram or picture…':mode==='video'?'Describe a short educational video…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
+});
+$('nexusCheckVideo')?.addEventListener('click',async()=>{
+ if(!nexusVideoJobId)return;
+ const btn=$('nexusCheckVideo');btn.disabled=true;
+ try{
+  const result=await nexusMediaRequest({action:'status',job_id:nexusVideoJobId});
+  if(result.status==='completed'&&result.url){
+   nexusRenderVideo(result.url,'Your generated study video');
+   $('nexusVideoJobBar')?.classList.add('hidden');msg($('nexusStatus'),'Your video is ready.','success');nexusVideoJobId='';
+  }else if(result.status==='failed'){
+   $('nexusVideoJobInfo').textContent=result.message||'Video generation failed.';
+  }else{
+   $('nexusVideoJobInfo').textContent='Video '+(result.status||'processing')+'. You can check again later.';
+  }
+ }catch(e){msg($('nexusStatus'),e.message||'Unable to check video status.','error')}
+ finally{btn.disabled=false}
+});
+
+$('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const q=$('nexusQuestion').value.trim();if(!q)return;const mode=$('nexusOutputMode')?.value||'text';if(mode==='image'||mode==='video'){
+ addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),mode==='image'?'Generating your picture…':'Submitting video render…','info');try{const result=await nexusMediaRequest({action:mode,prompt:q});if(mode==='image'&&result.image_base64){nexusRenderPicture(result.image_base64,q);msg($('nexusStatus'),'Image generated successfully. Use Download PNG to save it.','success')}else if(mode==='video'&&result.job_id){nexusVideoJobId=result.job_id;$('nexusVideoJobBar')?.classList.remove('hidden');$('nexusVideoJobInfo').textContent=result.message||'Video queued. Check back for the finished clip.';msg($('nexusStatus'),'Video request accepted. Use Check Video Status to retrieve it.','info')}else throw Error('No media was returned.')}catch(err){addChat('Nexus AI',err.message||'Could not generate this media.','ai-message');msg($('nexusStatus'),err.message||'Media unavailable.','error')}finally{$('nexusAskBtn').disabled=false}return}
+addChat('You',q,'user-message');$('nexusQuestion').value='';$('nexusAskBtn').disabled=true;msg($('nexusStatus'),'Nexus AI is thinking...');try{const r=await supabaseClient.functions.invoke('ai-tutor',{body:{action:'explain',question:q,programme:profile?.programme||'',style:$('nexusStyle').value,format_instruction:mode==='table'?'Provide a concise, accurate Markdown table. Use pipes and a header separator row, followed by short explanatory notes.':'Give a moderate, clear student-friendly answer with short headings, short paragraphs and lists when useful.',output_format:mode}});if(r.error){
  let serverBody={};
  try{if(r.error.context?.json)serverBody=await r.error.context.json()}catch(_){}
  const status=r.error.context?.status;
