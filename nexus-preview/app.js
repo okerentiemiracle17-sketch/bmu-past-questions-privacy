@@ -57,21 +57,25 @@ $('forgotPasswordForm')?.addEventListener('submit',async e=>{e.preventDefault();
 $('resendResetOtpBtn')?.addEventListener('click',async()=>{const b=$('resendResetOtpBtn');b.disabled=true;try{await sendResetOtp()}catch(e){msg($('forgotPasswordMessage'),e.message||'Unable to resend OTP.','error');if(resetSeconds<=0)b.disabled=false}});
 async function loadProfile(){profile=null;if(!user?.id)return;const {data,error}=await supabaseClient.from('profiles').select('id,full_name,email,programme,level,subscription_status,subscription_started_at,subscription_expires_at').eq('id',user.id).maybeSingle();if(!error)profile=data||{}}
 function updateUser(){const n=displayName(),first=n.trim().split(/\s+/)[0]||'Student';$('welcomeUser').textContent=`Good to see you, ${first}.`;$('headerUserName').textContent=first;$('profileInitial').textContent=first[0]?.toUpperCase()||'S'}
-async function nexusFreeRemaining(){
+function nexusCourseKey(value){
+ const code=s(value).toUpperCase().match(/\b[A-Z]{2,5}\s*-?\s*\d{3}[A-Z]?\b/);
+ return code?code[0].replace(/[^A-Z0-9]/g,''):s(value).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,30)||'GENERAL';
+}
+async function nexusFreeRemaining(courseCode='GENERAL'){
  if(isPremium(profile))return 999;
- const {data,error}=await supabaseClient.rpc('nexus_daily_free_remaining');
- if(error)throw new Error('Unable to check daily question balance.');
+ const {data,error}=await supabaseClient.rpc('nexus_daily_course_remaining',{p_course_code:nexusCourseKey(courseCode)});
+ if(error)throw new Error('Unable to check free-question balance for '+courseCode+'.');
  return Math.max(0,Math.min(5,Number(data)||0));
 }
-async function nexusClaimFree(key,count){
+async function nexusClaimFree(key,count,courseCode='GENERAL'){
  if(isPremium(profile))return count;
- const {data,error}=await supabaseClient.rpc('nexus_claim_free_questions',{p_key:key,p_count:count});
- if(error)throw new Error(error.message||'Daily free question limit reached.');
+ const {data,error}=await supabaseClient.rpc('nexus_claim_course_questions',{p_key:key,p_count:count,p_course_code:nexusCourseKey(courseCode)});
+ if(error)throw new Error(error.message||'Five-question limit reached for this course.');
  return Math.max(0,Math.min(5,Number(data)||0));
 }
-async function nexusRefreshDailyLimit(){
+async function nexusRefreshDailyLimit(courseCode='GENERAL'){
  if(isPremium(profile))return;
- try{const remaining=await nexusFreeRemaining();document.querySelectorAll('.nexus-daily-remaining').forEach(el=>el.textContent=remaining+' / 5 questions remaining today')}catch(e){console.warn(e)}
+ try{const remaining=await nexusFreeRemaining(courseCode);document.querySelectorAll('.nexus-daily-remaining').forEach(el=>el.textContent=remaining+' / 5 free questions left for '+nexusCourseKey(courseCode)+' today')}catch(e){console.warn(e)}
 }
 function applyFreeStudyLimits(){
  const free=!isPremium(profile);
@@ -91,7 +95,7 @@ function applyFreeStudyLimits(){
  const label=$('groupFreeLimitMessage');
  if(label)label.classList.toggle('hidden',!free);
 }
-function updateAccess(){premium=isPremium(profile);applyFreeStudyLimits();void nexusRefreshDailyLimit();const ex=expiry(profile?.subscription_expires_at);$('subscriptionBadge').textContent=premium?'Premium Active':'Free Access';$('subscriptionMeta').textContent=premium?(ex?`Until ${ex}`:'Full Access'):'5 questions daily';$('pqAccessLabel').textContent=premium?'Premium Active':'Free Access';$('pqAccessDetail').textContent=premium?'Up to 70 questions':'5 questions daily';$('accessCardTitle').textContent=premium?'Premium Access':'Free Access';$('accessCardText').textContent=premium?'Stored questions first, then approved-material Nexus AI, then validated general AI fallback.':'Free users can practise 5 questions per day across Solo, Study Groups and AI. Materials and videos require Premium.';$('questionCount').disabled=!premium;updateNexusGenerationAccess();$('materialsAccessLabel').textContent=premium?'Premium Library':'Library Preview';$('materialsAccessDetail').textContent=premium?'Books, notes and slides are unlocked':'Browse all resources • Premium opens locked items';renderProfile()}
+function updateAccess(){premium=isPremium(profile);applyFreeStudyLimits();void nexusRefreshDailyLimit();const ex=expiry(profile?.subscription_expires_at);$('subscriptionBadge').textContent=premium?'Premium Active':'Free Access';$('subscriptionMeta').textContent=premium?(ex?`Until ${ex}`:'Full Access'):'5 per course daily';$('pqAccessLabel').textContent=premium?'Premium Active':'Free Access';$('pqAccessDetail').textContent=premium?'Up to 70 questions':'5 per course daily';$('accessCardTitle').textContent=premium?'Premium Access':'Free Access';$('accessCardText').textContent=premium?'Stored questions first, then approved-material Nexus AI, then validated general AI fallback.':'Free users can practise 5 questions per course daily across Solo, Study Groups and AI. Materials and videos require Premium.';$('questionCount').disabled=!premium;updateNexusGenerationAccess();$('materialsAccessLabel').textContent=premium?'Premium Library':'Library Preview';$('materialsAccessDetail').textContent=premium?'Books, notes and slides are unlocked':'Browse all resources • Premium opens locked items';renderProfile()}
 const CORE_100_LEVEL_CODES=['BIO101','BIO107','CHM101','CHM107','COS101','COS107','GST111','MTH101','MTH111','PHY101','PHY107','STA111','BIO102','BIO108','CHM102','CHM108','COS102','COS108','GST112','GST114','MTH102','PHY102','PHY108'];
 function normalCourseCode(v){return s(v).toUpperCase().replace(/\s+/g,'')}
 let departmentCurriculum=[];
@@ -326,7 +330,7 @@ async function startQuiz(){
   const courseTitle=selectedCode?(selected?.dataset?.title||''):manualName;
   if(!courseCode){msg($('practiceSetupMessage'),'Select a listed course or enter a course code.','error');return}
   const format=$('questionType')?.value||'mcq';
-  premium=isPremium(profile);let remaining=70,existingCourseAllowance=0;try{if(!premium){const [balance,existing]=await Promise.all([nexusFreeRemaining(),supabaseClient.rpc('nexus_existing_free_course_allowance',{p_course_code:courseCode})]);remaining=balance;if(!existing.error)existingCourseAllowance=Math.max(0,Math.min(5,Number(existing.data)||0));}}catch(e){msg($('practiceSetupMessage'),e.message||'Cannot check free question balance.','error');msg($('pastPaperMessage'),e.message||'Cannot check free question balance.','error');return}if(!premium&&remaining<1&&existingCourseAllowance<1){const notice='Your 5 free questions for today have been used. They reset at midnight WAT. Upgrade to Premium for more.';msg($('practiceSetupMessage'),notice,'error');msg($('pastPaperMessage'),notice,'info');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,existingCourseAllowance||remaining);
+  premium=isPremium(profile);let remaining=70,existingCourseAllowance=0;try{if(!premium){const [balance,existing]=await Promise.all([nexusFreeRemaining(courseCode),supabaseClient.rpc('nexus_existing_free_course_allowance',{p_course_code:courseCode})]);remaining=balance;if(!existing.error)existingCourseAllowance=Math.max(0,Math.min(5,Number(existing.data)||0));}}catch(e){msg($('practiceSetupMessage'),e.message||'Cannot check free question balance.','error');msg($('pastPaperMessage'),e.message||'Cannot check free question balance.','error');return}if(!premium&&remaining<1&&existingCourseAllowance<1){const notice='Your 5 free questions for today have been used. They reset at midnight WAT. Upgrade to Premium for more.';msg($('practiceSetupMessage'),notice,'error');msg($('pastPaperMessage'),notice,'info');return}const wanted=premium?Math.min(70,Math.max(1,Number($('questionCount').value)||30)):Math.min(5,existingCourseAllowance||remaining);
   if(format==='theory'){await startTheoryPractice(courseCode,courseTitle,wanted);return}
   questions=[];answers={};reviews={};aiReviews={};qIndex=0;submitted=false;reviewMode=false;
   $('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Checking stored questions...');
@@ -339,7 +343,7 @@ async function startQuiz(){
     // The backend deducts free AI questions from the shared daily allowance.
     if(!questions.length&&!premium){
       msg($('practiceSetupMessage'),'No stored questions for '+courseCode+'. Nexus AI is preparing your free practice questions…','info');
-      const generated=await generateTopicQuestionSet('mcq',studyAiTopic('mcq',courseCode,courseTitle),wanted);
+      const generated=await generateTopicQuestionSet('mcq',studyAiTopic('mcq',courseCode,courseTitle),wanted,courseCode);
       questions.push(...convertGenerated(generated,'general_ai'));
       generatedViaNexus=true;
       void nexusRefreshDailyLimit();
@@ -354,7 +358,7 @@ async function startQuiz(){
 }
 function convertGenerated(rows,source){const letters=['A','B','C','D'];return rows.map((x,i)=>{if(!x?.question||!Array.isArray(x.options)||x.options.length<4)return null;const ci=Number(x.correct_index);if(!Number.isInteger(ci)||ci<0||ci>3)return null;const id=`${source}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,7)}`;aiReviews[id]={correct_option:letters[ci],answer_text:x.answer||x.options[ci],explanation:x.explanation||'Validated by Nexus AI.',is_ai:true};return{id,question_text:x.question,option_a:x.options[0],option_b:x.options[1],option_c:x.options[2],option_d:x.options[3],nexus_ai:true,source_mode:source}}).filter(Boolean)}
 
-async function generateTopicQuestionSet(format,topic,count){
+async function generateTopicQuestionSet(format,topic,count,courseCode=''){
  count=Math.min(isPremium(profile)?30:5,Math.max(1,Number(count)||5));
  const result=[],seen=new Set();let tries=0,empty=0,lastError='';
  const maxAttempts=Math.min(6,Math.max(2,Math.ceil(count/5)+1));
@@ -364,7 +368,7 @@ async function generateTopicQuestionSet(format,topic,count){
   const scopedTopic=topic+(recent.length?' Avoid duplicate questions: '+JSON.stringify(recent).slice(0,850):'');
   tries++;
   try{
-   const response=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count:need,topic:scopedTopic}});
+   const response=await supabaseClient.functions.invoke('ai-question-generator',{body:{action:'web_generate',format,count:need,topic:scopedTopic,course_code:nexusCourseKey(courseCode||topic)}});
    if(response.error){
     let body={};
     try{if(response.error.context?.json)body=await response.error.context.json()}catch(_){}
@@ -460,23 +464,24 @@ function renderSoloCourses(){const grid=$('soloCoursesGrid');if(!grid)return;con
  const match=src.filter(c=>(!q||(codeOf(c)+' '+titleOf(c)+' '+s(c.department)).toLowerCase().includes(q))&&(!lv||pastPaperLevel(c)===lv)&&(!dp||(canonicalPastPaperDept(s(c.department))===dp||pastPaperLevel(c)==='100'&&s(c.department)==='All Programmes')));
  const unique=new Map();for(const c of match){const key=normalCourseCode(codeOf(c));if(!key)continue;if(!unique.has(key))unique.set(key,c)}
  const rows=[...unique.values()].sort((a,b)=>codeOf(a).localeCompare(codeOf(b)));grid.innerHTML=rows.length?'':'<div class="material-empty">No course is listed for this department and level yet. Enter its course code in the AI Practice form below, or upload course notes to generate practice questions. AI-generated practice is separate from the past-paper archive.</div>';rows.forEach(c=>{const d=document.createElement('article');d.className='solo-course-card';d.innerHTML=`<span class="course-code">${esc(codeOf(c))}</span><h3>${esc(titleOf(c)||'Course')}</h3><p>${esc([c.level,c.department].filter(Boolean).join(' • '))}</p><div class="solo-course-actions"><button class="secondary-btn solo-mcq" type="button">MCQ</button><button class="primary-btn solo-theory" type="button">Theory</button></div>`;d.querySelector('.solo-mcq').addEventListener('click',()=>openSoloCourse(c,'mcq'));d.querySelector('.solo-theory').addEventListener('click',()=>openSoloCourse(c,'theory'));grid.appendChild(d)})}
-function openSoloCourse(c,format){
+async function openSoloCourse(c,format){
  go('past-questions');
  const choice=$('courseSelect'),matched=choice&&[...choice.options].find(o=>normalCourseCode(o.value)===normalCourseCode(codeOf(c)));
  if(choice)choice.value=matched?.value||'';
  $('manualCourseCode').value=matched?'':codeOf(c);
  $('manualCourseName').value=matched?'':titleOf(c);
  $('questionType').value=format;
- msg($('practiceSetupMessage'),`${codeOf(c)} selected for ${format==='theory'?'Theory':'MCQ'} practice.`,'success');
+ msg($('practiceSetupMessage'),`Preparing ${codeOf(c)} ${format==='theory'?'Theory':'MCQ'} practice…`,'info');
+ await startQuiz();
 }
 async function loadSoloLearning(){renderSoloFilters();renderSoloCourses();await loadSoloLeaderboard()}
 async function loadSoloLeaderboard(){const box=$('soloLeaderboard');if(!box)return;box.innerHTML='<div class="material-empty">Loading leaderboard...</div>';const {data,error}=await supabaseClient.rpc('get_solo_learning_leaderboard',{p_limit:10});if(error){box.innerHTML=`<div class="material-empty">${esc(error.message)}</div>`;return}const rows=Array.isArray(data)?data:[];box.innerHTML=rows.length?'':'<div class="material-empty">No ranked Solo Learning sessions yet.</div>';let myRank=null;rows.forEach((r,i)=>{const d=document.createElement('div');const mine=r.user_id===user?.id;if(mine)myRank=i+1;d.className='solo-leader-row'+(mine?' me':'');d.innerHTML=`<div class="solo-rank">#${i+1}</div><div><strong>${esc(r.display_name||'Student')}</strong><span>${esc(r.sessions??0)} sessions • ${esc(r.total_questions??0)} questions</span></div><div class="solo-score">${Number(r.average_percentage||0).toFixed(1)}%</div>`;box.appendChild(d)});$('soloRankDetail').textContent=myRank?`#${myRank} in Top 10`:'Complete a verified MCQ session to rank.'}
 $('soloCourseSearch')?.addEventListener('input',renderSoloCourses);$('soloLevelFilter')?.addEventListener('change',renderSoloCourses);$('soloDepartmentFilter')?.addEventListener('change',renderSoloCourses);
 $('soloManualMcqBtn')?.addEventListener('click',()=>openManualSolo('mcq'));$('soloManualTheoryBtn')?.addEventListener('click',()=>openManualSolo('theory'));
-function openManualSolo(format){const code=$('soloManualCode').value.trim().toUpperCase(),name=$('soloManualName').value.trim();if(!code){msg($('soloManualMessage'),'Enter the course code first.','error');return}go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=code;$('manualCourseName').value=name;$('questionType').value=format;msg($('practiceSetupMessage'),`${code}${name?' — '+name:''} will use Nexus AI Practice if stored content is unavailable.`,'success')}
+async function openManualSolo(format){const code=$('soloManualCode').value.trim().toUpperCase(),name=$('soloManualName').value.trim();if(!code){msg($('soloManualMessage'),'Enter the course code first.','error');return}go('past-questions');$('courseSelect').value='';$('manualCourseCode').value=code;$('manualCourseName').value=name;$('questionType').value=format;msg($('practiceSetupMessage'),`Preparing ${code} practice…`,'info');await startQuiz()}
 
 /* INDIVIDUAL THEORY PRACTICE */
-async function startTheoryPractice(courseCode,courseTitle,wanted){if(!isPremium(profile)&&!(pendingGeneratedPractice&&pendingGeneratedPractice.format==='theory')){msg($('practiceSetupMessage'),'Generate up to 5 free Theory questions from Nexus AI first, or subscribe to Premium for larger sets.','info');go('nexus-ai');setNexusMode('generate');return}theoryQuestions=[];theoryAnswers={};theoryGrades={};theoryIndex=0;theoryReviewMode=false;theoryCourseCode=courseCode;theoryCourseTitle=courseTitle||'Theory Practice';$('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Preparing Theory practice...');try{if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='theory'){theoryQuestions=convertTheory(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!theoryQuestions.length)throw new Error('The uploaded material did not produce usable Theory questions.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Uploaded Material';renderTheoryQ();startTheoryClock();return}let missing=wanted;if(premium){try{const r=await supabaseClient.functions.invoke('material-practice-generator',{body:{course_code:courseCode,format:'theory',count:Math.min(30,missing)}});if(!r.error&&r.data?.material_found&&Array.isArray(r.data.validated_questions)){theoryQuestions.push(...convertTheory(r.data.validated_questions,'material_ai'));missing=wanted-theoryQuestions.length}}catch(e){console.warn('theory material fallback skipped',e)}}if(missing>0){theoryQuestions.push(...await generalTheoryAi(courseCode,courseTitle,missing))}const seen=new Set();theoryQuestions=theoryQuestions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);if(!theoryQuestions.length)throw new Error('No Theory questions could be prepared for this course.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('quizShell').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Theory Practice';renderTheoryQ();startTheoryClock()}catch(e){msg($('practiceSetupMessage'),e.message||'Unable to prepare Theory practice.','error')}finally{$('loadQuestionsBtn').disabled=false}}
+async function startTheoryPractice(courseCode,courseTitle,wanted){theoryQuestions=[];theoryAnswers={};theoryGrades={};theoryIndex=0;theoryReviewMode=false;theoryCourseCode=courseCode;theoryCourseTitle=courseTitle||'Theory Practice';$('loadQuestionsBtn').disabled=true;msg($('practiceSetupMessage'),'Preparing Theory practice...');try{if(pendingGeneratedPractice&&pendingGeneratedPractice.format==='theory'){theoryQuestions=convertTheory(pendingGeneratedPractice.rows,'upload_ai').slice(0,wanted);pendingGeneratedPractice=null;if(!theoryQuestions.length)throw new Error('The uploaded material did not produce usable Theory questions.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Uploaded Material';renderTheoryQ();startTheoryClock();return}let missing=wanted;if(premium){try{const r=await supabaseClient.functions.invoke('material-practice-generator',{body:{course_code:courseCode,format:'theory',count:Math.min(30,missing)}});if(!r.error&&r.data?.material_found&&Array.isArray(r.data.validated_questions)){theoryQuestions.push(...convertTheory(r.data.validated_questions,'material_ai'));missing=wanted-theoryQuestions.length}}catch(e){console.warn('theory material fallback skipped',e)}}if(missing>0){theoryQuestions.push(...await generalTheoryAi(courseCode,courseTitle,missing))}const seen=new Set();theoryQuestions=theoryQuestions.filter(q=>{const k=s(q.question_text).trim().toLowerCase();if(!k||seen.has(k))return false;seen.add(k);return true}).slice(0,wanted);if(!theoryQuestions.length)throw new Error('No Theory questions could be prepared for this course.');seconds=(Number($('sessionMinutes').value)||30)*60;$('practiceSetup').classList.add('hidden');$('quizShell').classList.add('hidden');$('resultCard').classList.add('hidden');$('theoryResultCard').classList.add('hidden');$('theoryShell').classList.remove('hidden');$('theoryCourseCode').textContent=courseCode;$('theoryCourseTitle').textContent=courseTitle||'Theory Practice';renderTheoryQ();startTheoryClock()}catch(e){msg($('practiceSetupMessage'),e.message||'Unable to prepare Theory practice.','error')}finally{$('loadQuestionsBtn').disabled=false}}
 function convertTheory(rows,source){return rows.map((x,i)=>{const text=s(x?.question||x?.question_text).trim();if(!text)return null;return{id:`th_${source}_${Date.now()}_${i}_${Math.random().toString(36).slice(2,6)}`,question_text:text,marks:Math.min(20,Math.max(1,Number(x.marks)||10)),explanation:s(x.explanation),model_answer:s(x.model_answer||x.answer),marking_guide:s(x.marking_guide),source_mode:source}}).filter(Boolean)}
 async function generalTheoryAi(courseCode,courseTitle,count){
  const topic=studyAiTopic('theory',courseCode,courseTitle);
@@ -837,7 +842,7 @@ $('leaveStudyRoomBtn')?.addEventListener('click',leaveRoom);async function leave
 async function startGroupQuiz(){
  stopRoom();const roomSize=Number(roomData.total_questions)||10;let allowance=isPremium(profile)?70:5;
  if(!isPremium(profile)){
-  try{allowance=await nexusClaimFree('group:'+roomData.id,Math.min(5,roomSize));void nexusRefreshDailyLimit()}
+  try{allowance=await nexusClaimFree('group:'+roomData.id,Math.min(5,roomSize),roomData.selected_course||'GENERAL');void nexusRefreshDailyLimit()}
   catch(e){msg($('studyRoomLobbyMessage'),e.message,'error');$('groupFreePremiumNotice')?.classList.remove('hidden');return}
  }
  groupTotal=Math.min(roomSize,allowance);
