@@ -703,6 +703,26 @@ function nvChartValues(prompt){
  for(const m of String(prompt).matchAll(re)){const label=m[1].trim().replace(/^(?:chart|plot|graph|of|with|data|values|compare)\s+/i,'');const value=Number(m[2]);if(label&&Number.isFinite(value)&&value>=0)data.push({label,value});if(data.length>=8)break}
  return data;
 }
+function nvFreeTable(prompt){
+ const entries=nvChartValues(prompt);
+ if(entries.length<2)throw new Error('For a free data table, enter at least two values, for example: BIO: 15, CHM: 20, PHY: 10. AI-written comparisons use the separate AI Table option.');
+ const item=document.createElement('div');item.className='ai-message nexus-visual-message';
+ const title=document.createElement('strong');title.textContent='Nexus Visual Studio • Free Data Table';item.appendChild(title);
+ const note=document.createElement('p');note.textContent='Table based only on the figures you entered. No AI API credits used.';item.appendChild(note);
+ const wrap=document.createElement('div');wrap.className='nexus-table-wrap';
+ const table=document.createElement('table');table.className='nexus-table';
+ const header=document.createElement('thead');const tr=document.createElement('tr');
+ for(const label of ['Category','Value']){const th=document.createElement('th');th.textContent=label;tr.appendChild(th)}header.appendChild(tr);table.appendChild(header);
+ const tbody=document.createElement('tbody');
+ for(const row of entries){const tr=document.createElement('tr');for(const value of [row.label,String(row.value)]){const td=document.createElement('td');td.textContent=value;tr.appendChild(td)}tbody.appendChild(tr)}
+ table.appendChild(tbody);wrap.appendChild(table);item.appendChild(wrap);
+ const button=document.createElement('button');button.type='button';button.className='secondary-btn';button.textContent='Download CSV';
+ button.onclick=()=>{
+  const csv='Category,Value\r\n'+entries.map(r=>'"'+r.label.replaceAll('"','""')+'",'+r.value).join('\r\n');
+  nvDownload(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),'nexus-data-table.csv');
+ };
+ item.appendChild(button);$('nexusConversation').appendChild(item);$('nexusConversation').scrollTop=$('nexusConversation').scrollHeight;
+}
 function nvDiagram(prompt,progress=null){
  const kind=nvChoose(prompt);
  if(!kind)throw new Error('Free diagrams support: human heart, cell, nephron, simple electrical circuit, water cycle, flowchart and bar/pie charts. Try one of these topics.');
@@ -868,8 +888,8 @@ async function nexusMediaRequest(body){
 }
 $('nexusOutputMode')?.addEventListener('change',()=>{
  const mode=$('nexusOutputMode')?.value||'text',hint=$('nexusMediaNote');
- if(hint)hint.textContent=mode==='diagram'?'100% free: labelled schematic diagrams and charts; download PNG or SVG.':mode==='animation'?'100% free: short animated schematics; export WebM where supported.':mode==='image'?'Photorealistic AI images require a funded API key. Use Free Diagram instead.':mode==='video'?'AI-generated videos require a paid provider. Use Free Animation instead.':mode==='table'?'Ask Nexus for readable tables. Text AI chat quota applies.':'Text chat: 10 requests daily for free users.';
- if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='diagram'?'Try: Draw a labelled heart, nephron, plant cell, circuit or chart BIO: 12, CHM: 8…':mode==='animation'?'Try: Animate blood circulation, the water cycle or a circuit…':mode==='image'?'Describe an AI-generated picture (paid API required)…':mode==='video'?'Describe a generated AI video (paid API required)…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
+ if(hint)hint.textContent=mode==='free-table'?'100% free: turn your category:value numbers into a downloadable table.':mode==='diagram'?'100% free: labelled schematic diagrams and charts; download PNG or SVG.':mode==='animation'?'100% free: short animated schematics; export WebM where supported.':mode==='image'?'Photorealistic AI images require a funded API key. Use Free Diagram instead.':mode==='video'?'AI-generated videos require a paid provider. Use Free Animation instead.':mode==='table'?'Ask Nexus for readable tables. Text AI chat quota applies.':'Text chat: 10 requests daily for free users.';
+ if($('nexusQuestion'))$('nexusQuestion').placeholder=mode==='free-table'?'Enter pairs like BIO: 15, CHM: 20, PHY: 10…':mode==='diagram'?'Try: Draw a labelled heart, nephron, plant cell, circuit or chart BIO: 12, CHM: 8…':mode==='animation'?'Try: Animate blood circulation, the water cycle or a circuit…':mode==='image'?'Describe an AI-generated picture (paid API required)…':mode==='video'?'Describe a generated AI video (paid API required)…':mode==='table'?'What table or comparison should Nexus AI prepare?':'Message Nexus AI…';
 });
 $('nexusCheckVideo')?.addEventListener('click',async()=>{
  if(!nexusVideoJobId)return;
@@ -894,9 +914,9 @@ $('nexusAskForm')?.addEventListener('submit',async e=>{e.preventDefault();const 
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:generate|create|make)\s+(?:an?\s+)?(?:short\s+|educational\s+)?(?:video|animation)\b/i.test(q))mode='animation';
   else if(/^(?:please\s+|can you\s+|could you\s+)?(?:make|create|generate|draw|prepare)\s+(?:an?\s+)?(?:comparison\s+)?table\b/i.test(q))mode='table';
  }
- if(mode==='diagram'||mode==='animation'){
+ if(mode==='diagram'||mode==='animation'||mode==='free-table'){
   addChat('You',q,'user-message');$('nexusQuestion').value='';
-  try{nvShowVisual(q,mode==='animation');msg($('nexusStatus'),'Free visual ready. Download PNG, SVG or WebM (animations).','success')}
+  try{if(mode==='free-table')nvFreeTable(q);else nvShowVisual(q,mode==='animation');msg($('nexusStatus'),mode==='free-table'?'Free data table ready. Download CSV.':'Free visual ready. Download PNG, SVG or WebM (animations).','success')}
   catch(err){addChat('Nexus AI',err.message||'This free visual is not available.','ai-message');msg($('nexusStatus'),err.message||'Visual unavailable.','error')}
   return;
  }
