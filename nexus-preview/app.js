@@ -509,6 +509,17 @@ function nexusRichText(text){
   for(let i=0;i<lines.length;i++){
     const t=lines[i].trim();
     if(!t){flush();continue}
+    // Display safe media from AI markdown or direct HTTPS URLs; never execute AI HTML.
+    const imageMatch=t.match(/^!\\[([^\\]]*)\\]\\((https:\\/\\/[^\\s)]+)\\)$/i) || t.match(/^(https:\\/\\/[^\\s]+\\.(?:png|jpe?g|webp|gif)(?:\\?[^\\s]*)?)$/i);
+    if(imageMatch){
+      const url=imageMatch[2]||imageMatch[1],label=imageMatch[2]?imageMatch[1]:'Study illustration';
+      try{const u=new URL(url);if(u.protocol==='https:'&&/\\.(png|jpe?g|webp|gif)$/i.test(u.pathname)){flush();out.push('<figure class="nexus-media"><img src="'+esc(u.href)+'" alt="'+esc(label)+'" loading="lazy" referrerpolicy="no-referrer"><figcaption>'+esc(label)+'</figcaption></figure>');continue}}catch(_e){}
+    }
+    const videoMatch=t.match(/^\\[([^\\]]+)\\]\\((https:\\/\\/[^\\s)]+)\\)$/i)||t.match(/^(https:\\/\\/[^\\s]+)$/i);
+    if(videoMatch){
+      const url=videoMatch[2]||videoMatch[1],label=videoMatch[2]?videoMatch[1]:'Open study video';
+      try{const u=new URL(url);if(u.protocol==='https:'&&(/(?:^|\\.)youtube\\.com$|(?:^|\\.)youtu\\.be$|(?:^|\\.)vimeo\\.com$/.test(u.hostname)||/\\.(mp4|webm)$/i.test(u.pathname))){flush();out.push('<a class="nexus-video-link" href="'+esc(u.href)+'" target="_blank" rel="noopener noreferrer">▶ '+esc(label)+'</a>');continue}}catch(_e){}
+    }
     // Convert simple Markdown tables into a clean responsive HTML table.
     if(t.startsWith('|')&&t.endsWith('|')&&i+1<lines.length&&/^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*$/.test(lines[i+1])){
       flush();const heads=t.slice(1,-1).split('|').map(x=>inline(x.trim()));i+=2;const rows=[];
