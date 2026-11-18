@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nexusbmupastquestion.mnexus.com.ng/sitemap.xml
